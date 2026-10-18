@@ -17,6 +17,7 @@ let multiGuessInput = $state('');
 let secretVisible = $state(false);
 let nameField = $state<HTMLInputElement>();
 let guessField = $state<HTMLInputElement>();
+let guessRow = $state<HTMLElement>();
 let resultHeader = $state<HTMLElement>();
 // Changes only when a new player starts setup, so typing is never overwritten.
 const setupSlot = $derived(
@@ -99,10 +100,18 @@ async function savePlayerSetup() {
 	secretVisible = false;
 	await tick();
 	if ($gameStore.gamePhase === 'guessing') {
-		guessField?.focus();
+		focusGuessField();
 	} else {
 		nameField?.focus();
 	}
+}
+
+// Focusing a field that already has focus does not scroll, and each guess
+// adds history rows above it, so bring the whole row, Submit included, back
+// into the panel's view.
+function focusGuessField() {
+	guessField?.focus();
+	guessRow?.scrollIntoView?.({ block: 'nearest' });
 }
 
 async function playAgain() {
@@ -166,7 +175,7 @@ async function makeMultiPlayerGuess() {
 	if ($gameStore.gameOver) {
 		resultHeader?.focus();
 	} else {
-		guessField?.focus();
+		focusGuessField();
 	}
 }
 
@@ -314,7 +323,7 @@ function handleGuessKeyDown(e: KeyboardEvent) {
 </div>
 	
 {#if $gameStore.gamePhase === 'guessing'}
-	<div class="surface-translucent my-5 flex flex-wrap items-center justify-center gap-4 rounded-2xl border-[1.5px] border-[var(--glass-border)] p-4">
+	<div bind:this={guessRow} class="surface-translucent my-5 flex flex-wrap items-center justify-center gap-4 rounded-2xl border-[1.5px] border-[var(--glass-border)] p-4">
 		<div class="flex items-center gap-2">
 			<label for="target-player" class="font-semibold">{t.multi.guessFor}</label>
 			<select

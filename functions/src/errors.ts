@@ -43,6 +43,15 @@ export function toHttpsError(error: unknown): HttpsError {
 	return new HttpsError('internal', 'ONLINE_GAME_INTERNAL')
 }
 
+// The SDK leaves request.app unset when the App Check token is missing or
+// fails verification. The rejection reuses AUTH_REQUIRED because the client
+// already shows it as a sign-in failure the player can retry.
+export function requireAppCheck(app: object | undefined, enforced: boolean): void {
+	if (enforced && !app) {
+		throw new CommandError('unauthenticated', 'AUTH_REQUIRED')
+	}
+}
+
 export function requireUid(auth: { uid: string } | undefined): string {
 	if (!auth?.uid) {
 		throw new CommandError('unauthenticated', 'AUTH_REQUIRED')

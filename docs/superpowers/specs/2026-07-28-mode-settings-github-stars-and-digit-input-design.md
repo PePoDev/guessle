@@ -1,3 +1,5 @@
+> Superseded: this is a dated spec kept for history. README.md is the source of truth; later changes include Guessle (daily) and Random in place of `single`, a Settings gear that always offers language and sound, an icon-only link to `PePoDev/guessle`, and Thai numerals in digit fields.
+
 # Mode Settings, GitHub Stars, and Digit Input Design
 
 ## Goal

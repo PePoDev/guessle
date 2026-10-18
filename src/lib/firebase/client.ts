@@ -1,4 +1,11 @@
-import { getApp, getApps, initializeApp } from 'firebase/app'
+import {
+	getApp,
+	getApps,
+	initializeApp,
+	type FirebaseApp,
+	type FirebaseOptions,
+} from 'firebase/app'
+import { ReCaptchaEnterpriseProvider, initializeAppCheck } from 'firebase/app-check'
 import {
 	browserLocalPersistence,
 	connectAuthEmulator,
@@ -18,6 +25,22 @@ const demoConfig = {
 	storageBucket: 'demo-number-guessing.appspot.com',
 	messagingSenderId: '100000000000',
 	appId: '1:100000000000:web:0000000000000000000000',
+}
+
+function createApp(config: FirebaseOptions): FirebaseApp {
+	const app = initializeApp(config)
+	// The emulators accept calls without App Check, and reCAPTCHA would reach
+	// Google from tests; only a build with a site key opts in.
+	const siteKey: string = useEmulators
+		? ''
+		: import.meta.env.PUBLIC_FIREBASE_APP_CHECK_SITE_KEY || ''
+	if (siteKey) {
+		initializeAppCheck(app, {
+			provider: new ReCaptchaEnterpriseProvider(siteKey),
+			isTokenAutoRefreshEnabled: true,
+		})
+	}
+	return app
 }
 
 export async function getFirebaseClient() {
@@ -48,7 +71,7 @@ export async function getFirebaseClient() {
 	if (required.some((value) => !value)) {
 		throw new Error('FIREBASE_CONFIG_MISSING')
 	}
-	const app = getApps().length ? getApp() : initializeApp(config)
+	const app = getApps().length ? getApp() : createApp(config)
 	const auth = getAuth(app)
 	const firestore = getFirestore(app)
 	const functions = getFunctions(

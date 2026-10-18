@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { get } from "svelte/store";
@@ -798,6 +798,34 @@ describe('MultiPlayerGame turn handling', () => {
 			expect(screen.getByRole('alert').textContent?.trim()).toBe('')
 		})
 		expect(screen.getByLabelText('Secret Number:')).toHaveValue('')
+	})
+
+	// jsdom does not lay out, so this pins the call; e2e/layout.spec.ts checks
+	// that the field really stays inside the panel on a phone.
+	it('brings the guess row back into view when guessing starts and after each Enter', async () => {
+		const scrollIntoView = vi.fn()
+		Object.defineProperty(Element.prototype, 'scrollIntoView', {
+			configurable: true,
+			value: scrollIntoView,
+		})
+		try {
+			const user = userEvent.setup()
+			await setUpPlayers(user, ['123', '456'])
+			expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+			scrollIntoView.mockClear()
+
+			await user.type(screen.getByLabelText('Guess'), '111{Enter}')
+
+			expect(screen.getByLabelText('Guess')).toHaveFocus()
+			expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+			const row = scrollIntoView.mock.contexts.at(-1) as Element
+			expect(row).toContainElement(screen.getByLabelText('Guess'))
+			expect(row).toContainElement(
+				screen.getByRole('button', { name: 'Submit Guess' }),
+			)
+		} finally {
+			Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+		}
 	})
 
 	it('ignores Enter while an input method is composing', async () => {

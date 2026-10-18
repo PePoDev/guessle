@@ -1,3 +1,5 @@
+> Superseded: this is a dated spec kept for history. README.md is the source of truth; later changes include the Blaze plan, API, and role prerequisites and the `--non-interactive --force` deploy, because this change alone did not get the backend deployed.
+
 # Firebase Deployment Recovery Design
 
 ## Problem

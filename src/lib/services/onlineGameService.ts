@@ -190,13 +190,21 @@ export function decodeOnlineSnapshot(raw: RawSnapshot): OnlineSnapshot {
 	}
 }
 
+function browserOffline(): boolean {
+	return typeof navigator !== 'undefined' && navigator.onLine === false
+}
+
 export function mapOnlineGameError(error: unknown): OnlineErrorCode {
 	if (!error || typeof error !== 'object' || Array.isArray(error)) {
 		return 'ONLINE_GAME_INTERNAL'
 	}
 	const data = error as Record<string, unknown>
 	const code = typeof data.code === 'string' ? data.code : ''
-	if (code.endsWith('/unavailable') || code === 'unavailable') {
+	if (
+		code.endsWith('/unavailable') ||
+		code === 'unavailable' ||
+		code === 'auth/network-request-failed'
+	) {
 		return 'CONNECTION_INTERRUPTED'
 	}
 	if (code.endsWith('/aborted') || code === 'aborted') {
@@ -210,6 +218,14 @@ export function mapOnlineGameError(error: unknown): OnlineErrorCode {
 	const reason = serverReasons.find((candidate) => message.includes(candidate))
 	if (reason) {
 		return reason
+	}
+	// The server names every failure it sends, so a bare 'internal' means the
+	// browser never got an answer: the Functions SDK reports a failed fetch as
+	// status 0, and from 0.14 it appends that status as ' [0]'. A function that
+	// was never deployed fails that way too, because its 404 carries no CORS
+	// headers; only the browser's own state tells the two apart.
+	if (code === 'functions/internal' && /^internal(?: \[0\])?$/.test(message)) {
+		return browserOffline() ? 'CONNECTION_INTERRUPTED' : 'ONLINE_UNAVAILABLE'
 	}
 	// A missing callable, missing web config, or disabled anonymous sign-in all
 	// mean the backend is not set up, which retrying cannot fix.

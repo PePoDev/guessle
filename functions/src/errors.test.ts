@@ -1,13 +1,28 @@
 import { logger } from 'firebase-functions/logger'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DomainError } from './domain.js'
-import { CommandError, requireUid, toHttpsError } from './errors.js'
+import { CommandError, requireAppCheck, requireUid, toHttpsError } from './errors.js'
 
 afterEach(() => {
 	vi.restoreAllMocks()
 })
 
 describe('callable errors', () => {
+	it('lets calls without App Check through while enforcement is off', () => {
+		expect(() => requireAppCheck(undefined, false)).not.toThrow()
+		expect(() => requireAppCheck({ appId: 'web' }, false)).not.toThrow()
+	})
+
+	it('rejects calls without a verified App Check token when enforced', () => {
+		expect(() => requireAppCheck({ appId: 'web' }, true)).not.toThrow()
+		expect(() => requireAppCheck(undefined, true)).toThrow(
+			expect.objectContaining({
+				code: 'unauthenticated',
+				reason: 'AUTH_REQUIRED',
+			}),
+		)
+	})
+
 	it('requires an authenticated uid', () => {
 		expect(requireUid({ uid: 'player' })).toBe('player')
 		expect(() => requireUid(undefined)).toThrow(

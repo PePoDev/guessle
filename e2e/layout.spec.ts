@@ -347,3 +347,34 @@ test('keeps the natural page flow on a phone held sideways', async ({ page }) =>
 	await enter.scrollIntoViewIfNeeded()
 	await expect(enter).toBeInViewport({ ratio: 1 })
 })
+
+test('keeps the local guess field and Submit inside the panel on a phone', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 })
+	await openGuessle(page)
+	await page.getByRole('button', { name: /Multiplayer/ }).click()
+	for (const secret of ['123', '456']) {
+		await page.getByLabel('Secret Number:').fill(secret)
+		await page.keyboard.press('Enter')
+	}
+	const field = page.getByLabel('Guess', { exact: true })
+	await expect(field).toBeFocused()
+
+	// Enter keeps focus in the field, which is where it used to slip below the panel.
+	for (const [turn, digits] of ['111', '222', '333'].entries()) {
+		await page.keyboard.type(digits)
+		await page.keyboard.press('Enter')
+		await expect(page.getByText(`: ${digits}`)).toHaveCount(1)
+		await expect(page.getByText(/turn to guess/)).toHaveText(`Player ${turn % 2 === 0 ? 2 : 1}'s turn to guess`)
+		await expect(field).toBeFocused()
+	}
+
+	const panel = await page.getByRole('main').evaluate((element) => {
+		const { top, bottom } = element.getBoundingClientRect()
+		return { top, bottom }
+	})
+	for (const control of [field, page.getByRole('button', { name: 'Submit Guess' })]) {
+		const box = (await control.boundingBox())!
+		expect(box.y).toBeGreaterThanOrEqual(panel.top + 8)
+		expect(box.y + box.height).toBeLessThanOrEqual(panel.bottom - 8)
+	}
+})

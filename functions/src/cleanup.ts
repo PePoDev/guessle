@@ -57,3 +57,53 @@ export async function cleanupExpiredRooms(
 		cursor = page.docs[page.docs.length - 1]
 	}
 }
+
+async function deleteExpiredRateLimit(
+	firestore: Firestore,
+	limit: DocumentReference,
+	now: Timestamp,
+): Promise<boolean> {
+	// Re-checked in a transaction because createRoom may have refreshed the
+	// window since the query, and deleting it then would forget a recent room.
+	return firestore.runTransaction(async (transaction) => {
+		const expiresAt = (await transaction.get(limit)).get('expiresAt')
+		if (!(expiresAt instanceof Timestamp) || expiresAt.toMillis() > now.toMillis()) {
+			return false
+		}
+		transaction.delete(limit)
+		return true
+	})
+}
+
+export async function cleanupExpiredRateLimits(
+	firestore: Firestore = db,
+	now: Timestamp = Timestamp.now(),
+	pageSize = 200,
+): Promise<string[]> {
+	const deleted: string[] = []
+	let cursor: QueryDocumentSnapshot | undefined
+
+	for (;;) {
+		let expiredQuery = firestore
+			.collection('rateLimits')
+			.where('expiresAt', '<=', now)
+			.orderBy('expiresAt')
+			.limit(pageSize)
+		if (cursor) {
+			expiredQuery = expiredQuery.startAfter(cursor)
+		}
+		const page = await expiredQuery.get()
+		const results = await Promise.all(
+			page.docs.map((limit) => deleteExpiredRateLimit(firestore, limit.ref, now)),
+		)
+		page.docs.forEach((limit, index) => {
+			if (results[index]) {
+				deleted.push(limit.id)
+			}
+		})
+		if (page.size < pageSize) {
+			return deleted
+		}
+		cursor = page.docs[page.docs.length - 1]
+	}
+}

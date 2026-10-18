@@ -20,13 +20,18 @@
 		initialRoomId = '',
 	}: Props = $props()
 	let name = $state('')
-	let roomIdInput = $state(initialRoomId)
+	// An invite only pre-fills the field; after that it belongs to the player.
+	let roomIdInput = $state(untrack(() => initialRoomId))
 	let secret = $state('')
 	let guess = $state('')
 	let targetChoice = $state('')
 	let confirmingForfeit = $state(false)
 	let guessField = $state<HTMLInputElement>()
 	let heading = $state<HTMLElement>()
+	let errorRegion = $state<HTMLElement>()
+	// A saved room that could not be reopened waits for the player to retry or
+	// forget it, so a restore never fails silently into the entry form.
+	let restoreFailed = $state(false)
 	// Mirrors IDLE_TURN_SECONDS on the server, which makes the final check.
 	const idleTurnMs = 120_000
 	let clock = $state(Date.now())
@@ -123,25 +128,41 @@
 			: fallback
 	}
 
+	// A failed command is not retried by itself, so even a lost connection is
+	// reported as an error the player can act on rather than as reconnecting.
 	function reportError(
 		error: unknown,
 		fallback: OnlineErrorCode = 'ONLINE_GAME_INTERNAL',
 	): void {
 		const code = errorCode(error, fallback)
-		if (code === 'CONNECTION_INTERRUPTED') {
-			gameStore.setOnlineStatus('reconnecting')
-			return
+		// A room snapshot proves the backend exists, so an unanswered command
+		// inside a room is a lost connection, not a missing backend.
+		gameStore.setOnlineStatus(
+			'error',
+			code === 'ONLINE_UNAVAILABLE' && room ? 'CONNECTION_INTERRUPTED' : code,
+		)
+	}
+
+	// The control that started a command is disabled while it runs, which drops
+	// focus to the page; the error takes it so keyboard and screen-reader users
+	// hear what happened and keep their place.
+	async function focusError() {
+		await tick()
+		if ($gameStore.online.error) {
+			errorRegion?.focus()
 		}
-		gameStore.setOnlineStatus('error', code)
 	}
 
 	// Runs one server command at a time and shows any failure as an online error.
-	async function act(command: () => Promise<void>) {
+	async function act(command: () => Promise<void>): Promise<boolean> {
 		busy = true
 		try {
 			await command()
+			return true
 		} catch (error) {
 			reportError(error)
+			await focusError()
+			return false
 		} finally {
 			busy = false
 		}
@@ -149,6 +170,7 @@
 
 	function enterRoom(enter: () => Promise<{ uid: string; roomId: string }>) {
 		gameStore.setOnlineStatus('connecting')
+		restoreFailed = false
 		return act(async () => {
 			const session = await enter()
 			gameStore.setOnlineIdentity(session.uid, session.roomId)
@@ -216,10 +238,13 @@
 			return
 		}
 		const { id: roomId, turnNumber } = room
-		await act(async () => {
+		const submitted = await act(async () => {
 			await service.submitGuess({ roomId, targetUid, guess, turnNumber })
 			guess = ''
 		})
+		if (!submitted) {
+			return
+		}
 		await tick()
 		if (canGuess) {
 			guessField?.focus()
@@ -278,27 +303,47 @@
 		}
 	}
 
+	async function restoreRoom(): Promise<boolean> {
+		try {
+			const session = await service.restoreSession()
+			restoreFailed = false
+			if (session) {
+				gameStore.setOnlineIdentity(session.uid, session.roomId)
+				activeRoomId = session.roomId
+			}
+			return true
+		} catch {
+			restoreFailed = true
+			gameStore.setOnlineStatus('error', 'RESTORE_FAILED')
+			return false
+		}
+	}
+
+	async function retryRestore() {
+		busy = true
+		// Clears the old error; a restored session sets its own status.
+		gameStore.setOnlineStatus('idle')
+		const restored = await restoreRoom()
+		busy = false
+		if (!restored) {
+			await focusError()
+		}
+	}
+
+	async function forgetRoom() {
+		service.clearSession()
+		gameStore.clearOnlineSession()
+		restoreFailed = false
+		await tick()
+		heading?.focus()
+	}
+
 	onMount(() => {
 		if (service === onlineGameService) {
 			preloadOnlineBackend()
 		}
 		if (!initialRoomId && !$gameStore.online.roomId) {
-			void service
-				.restoreSession()
-				.then((session) => {
-					if (session) {
-						gameStore.setOnlineIdentity(session.uid, session.roomId)
-						activeRoomId = session.roomId
-					}
-				})
-				.catch((error: unknown) => {
-					// Nothing retries a failed restore, so never claim to be reconnecting.
-					const code = errorCode(error, 'RESTORE_FAILED')
-					gameStore.setOnlineStatus(
-						'error',
-						code === 'CONNECTION_INTERRUPTED' ? 'RESTORE_FAILED' : code,
-					)
-				})
+			void restoreRoom()
 		}
 		const timer = setInterval(() => {
 			clock = Date.now()
@@ -366,7 +411,7 @@
 {/snippet}
 
 <!-- Live regions stay mounted so screen readers announce every change. -->
-<div role="alert">
+<div role="alert" tabindex="-1" bind:this={errorRegion}>
 	{#if $gameStore.online.error}
 		<p class="banner banner-incorrect mb-4">
 			{t.online.errors[$gameStore.online.error]}
@@ -381,7 +426,32 @@
 	</p>
 {/if}
 
-{#if !room}
+{#if !room && restoreFailed}
+	<section
+		aria-labelledby="online-restore-heading"
+		class="space-y-5 text-[var(--glass-fg)]"
+	>
+		<div>
+			<p class="eyebrow">
+				{t.modes.online}
+			</p>
+			<h2 id="online-restore-heading" bind:this={heading} tabindex="-1" class="font-display text-2xl font-bold">
+				{t.online.restoreHeading}
+			</h2>
+		</div>
+		<p aria-live="polite" class="text-sm text-[var(--glass-muted)]">
+			{connecting ? t.online.connecting : t.online.restoreHint}
+		</p>
+		<div class="flex flex-wrap gap-3">
+			<button type="button" onclick={retryRestore} disabled={busy} class="btn-primary">
+				{t.online.tryAgain}
+			</button>
+			<button type="button" onclick={forgetRoom} disabled={busy} class="btn-secondary">
+				{t.online.forgetRoom}
+			</button>
+		</div>
+	</section>
+{:else if !room}
 	<section
 		aria-labelledby="online-entry-heading"
 		class="space-y-5 text-[var(--glass-fg)]"

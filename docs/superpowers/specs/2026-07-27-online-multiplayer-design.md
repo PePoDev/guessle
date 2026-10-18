@@ -1,3 +1,5 @@
+> Superseded: this is a dated spec kept for history. README.md is the source of truth; later changes include an Online nav card with a Local/Online switch, starting once at least two players are ready, forfeiting on leave, removing idle players, Functions in `asia-southeast1` configured from repository secrets, Guessle (daily) and Random in place of `single`, and no New Game button.
+
 # Firebase Online Multiplayer Design
 
 **Status:** Approved for implementation planning  

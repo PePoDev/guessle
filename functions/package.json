@@ -1,5 +1,5 @@
 {
-  "name": "number-guessing-functions",
+  "name": "guessle-functions",
   "private": true,
   "type": "module",
   "main": "lib/index.js",
@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run src/domain.test.ts src/errors.test.ts",
-    "test:emulator": "vitest run src/roomCommands.test.ts src/guessCommand.test.ts src/cleanup.test.ts",
+    "test:emulator": "vitest run src/roomCommands.test.ts src/guessCommand.test.ts src/cleanup.test.ts src/index.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

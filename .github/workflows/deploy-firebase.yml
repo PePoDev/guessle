@@ -58,9 +58,30 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      # Generated here, never committed: the Firebase CLI reads
+      # functions/.env.<project id> for this project's deploy only.
+      - name: Write Functions environment
+        env:
+          ENFORCE_APP_CHECK: ${{ vars.ENFORCE_APP_CHECK || 'false' }}
+          PROJECT_ID: ${{ secrets.PUBLIC_FIREBASE_PROJECT_ID }}
+        run: |
+          case "$ENFORCE_APP_CHECK" in
+            true | false) ;;
+            *)
+              echo "::error::ENFORCE_APP_CHECK must be true or false"
+              exit 1
+              ;;
+          esac
+          printf 'ENFORCE_APP_CHECK=%s\n' "$ENFORCE_APP_CHECK" > "functions/.env.$PROJECT_ID"
+
+      # --force lets the CLI set the Artifact Registry cleanup policy and remove
+      # functions deleted from the source instead of stopping at a prompt. It
+      # also deletes Firestore indexes and field overrides (TTL policies too)
+      # that firestore.indexes.json does not list, so they must live there.
       - name: Deploy Firebase backend
         run: >
           pnpm firebase deploy
           --project "${{ secrets.PUBLIC_FIREBASE_PROJECT_ID }}"
           --only functions,firestore:rules,firestore:indexes
           --non-interactive
+          --force

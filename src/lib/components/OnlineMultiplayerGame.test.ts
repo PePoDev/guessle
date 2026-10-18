@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import { tick } from 'svelte'
@@ -740,4 +740,205 @@ it('waits for the host to be ready before starting', () => {
 	})
 
 	expect(screen.getByRole('button', { name: 'Start Game' })).toBeDisabled()
+})
+
+it('moves focus to the error when a command fails', async () => {
+	const user = userEvent.setup()
+	const service = createFakeOnlineGameService()
+	vi.mocked(service.createRoom).mockRejectedValue(new Error('ONLINE_UNAVAILABLE'))
+	render(OnlineMultiplayerGame, { props: { service } })
+
+	await user.type(screen.getByLabelText('Display name'), 'Ada')
+	await user.click(screen.getByRole('button', { name: 'Create Room' }))
+
+	const alert = screen.getByRole('alert')
+	await waitFor(() => {
+		expect(alert).toHaveTextContent(
+			"Online play isn't available right now. Try Single Player or Local Multiplayer.",
+		)
+		expect(alert).toHaveFocus()
+	})
+	expect(screen.getByRole('button', { name: 'Create Room' })).toBeEnabled()
+})
+
+it('reports a lost connection on a command as an error to retry, not as reconnecting', async () => {
+	const user = userEvent.setup()
+	const service = createFakeOnlineGameService()
+	vi.mocked(service.joinRoom).mockRejectedValue(new Error('CONNECTION_INTERRUPTED'))
+	render(OnlineMultiplayerGame, {
+		props: { service, initialRoomId: 'AB2C3D' },
+	})
+
+	await user.type(screen.getByLabelText('Display name'), 'Lin')
+	await user.click(screen.getByRole('button', { name: 'Join Room' }))
+
+	await waitFor(() => {
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			"Couldn't reach the game server. Check your connection and try again.",
+		)
+	})
+	expect(screen.getByRole('alert')).toHaveFocus()
+	expect(screen.getByRole('status')).not.toHaveTextContent('Reconnecting…')
+})
+
+it('keeps focus on the error when a guess is rejected', async () => {
+	const user = userEvent.setup()
+	const service = createFakeOnlineGameService()
+	vi.mocked(service.submitGuess).mockRejectedValue(new Error('TURN_STALE'))
+	gameStore.setOnlineIdentity('host', 'AB2C3D')
+	gameStore.applyOnlineSnapshot(guessingSnapshot({ currentGuesserUid: 'host' }))
+	render(OnlineMultiplayerGame, { props: { service } })
+
+	await user.type(screen.getByLabelText('Guess'), '456{Enter}')
+
+	await waitFor(() => {
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			'The turn changed. Try again.',
+		)
+	})
+	expect(screen.getByRole('alert')).toHaveFocus()
+})
+
+it('reports an unanswered command inside a room as a lost connection', async () => {
+	const user = userEvent.setup()
+	const service = createFakeOnlineGameService()
+	vi.mocked(service.submitGuess).mockRejectedValue(new Error('ONLINE_UNAVAILABLE'))
+	gameStore.setOnlineIdentity('host', 'AB2C3D')
+	gameStore.applyOnlineSnapshot(guessingSnapshot({ currentGuesserUid: 'host' }))
+	render(OnlineMultiplayerGame, { props: { service } })
+
+	await user.type(screen.getByLabelText('Guess'), '456{Enter}')
+
+	await waitFor(() => {
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			"Couldn't reach the game server. Check your connection and try again.",
+		)
+	})
+	expect(screen.getByRole('alert')).toHaveFocus()
+})
+
+it('moves focus to the error in Thai too', async () => {
+	const user = userEvent.setup()
+	gameStore.setLocale('th')
+	const service = createFakeOnlineGameService()
+	vi.mocked(service.createRoom).mockRejectedValue(new Error('ONLINE_UNAVAILABLE'))
+	render(OnlineMultiplayerGame, { props: { service } })
+
+	await user.type(screen.getByLabelText('ชื่อที่แสดง'), 'อลิซ')
+	await user.click(screen.getByRole('button', { name: 'สร้างห้อง' }))
+
+	await waitFor(() => {
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			'ตอนนี้ยังเล่นออนไลน์ไม่ได้ ลองเล่นคนเดียวหรือเล่นหลายคนในเครื่องเดียวก่อนนะ',
+		)
+	})
+	expect(screen.getByRole('alert')).toHaveFocus()
+})
+
+describe('a saved room that cannot be restored', () => {
+	function failingRestore() {
+		const service = createFakeOnlineGameService()
+		vi.mocked(service.restoreSession).mockRejectedValue(
+			new Error('ONLINE_GAME_INTERNAL'),
+		)
+		return service
+	}
+
+	it('offers to try again or forget the room instead of the entry form', async () => {
+		render(OnlineMultiplayerGame, { props: { service: failingRestore() } })
+
+		expect(
+			await screen.findByRole('heading', { name: 'Your saved room' }),
+		).toBeInTheDocument()
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			'Could not restore the room.',
+		)
+		expect(
+			screen.getByText('Try again, or forget this room to create or join another one.'),
+		).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+		expect(screen.getByRole('button', { name: 'Forget this room' })).toBeEnabled()
+		expect(screen.queryByLabelText('Display name')).not.toBeInTheDocument()
+	})
+
+	it('retries the restore and keeps focus on a repeated failure', async () => {
+		const user = userEvent.setup()
+		const service = failingRestore()
+		render(OnlineMultiplayerGame, { props: { service } })
+
+		await user.click(await screen.findByRole('button', { name: 'Try again' }))
+
+		expect(service.restoreSession).toHaveBeenCalledTimes(2)
+		await waitFor(() => {
+			expect(screen.getByRole('alert')).toHaveTextContent(
+				'Could not restore the room.',
+			)
+			expect(screen.getByRole('alert')).toHaveFocus()
+		})
+
+		vi.mocked(service.restoreSession).mockResolvedValue({
+			uid: 'host',
+			roomId: 'AB2C3D',
+		})
+		await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+		await waitFor(() => {
+			expect(service.subscribeToRoom).toHaveBeenCalledWith(
+				'AB2C3D',
+				expect.any(Function),
+				expect.any(Function),
+			)
+		})
+		expect(
+			screen.queryByRole('button', { name: 'Forget this room' }),
+		).not.toBeInTheDocument()
+		expect(screen.getByRole('alert').textContent?.trim()).toBe('')
+	})
+
+	it('returns to a usable entry form when the retry finds no saved room', async () => {
+		const user = userEvent.setup()
+		const service = failingRestore()
+		render(OnlineMultiplayerGame, { props: { service } })
+		await screen.findByRole('button', { name: 'Try again' })
+		vi.mocked(service.restoreSession).mockResolvedValue(null)
+
+		await user.click(screen.getByRole('button', { name: 'Try again' }))
+		await user.type(await screen.findByLabelText('Display name'), 'Ada')
+
+		expect(screen.getByRole('button', { name: 'Create Room' })).toBeEnabled()
+		expect(
+			screen.getByText('Create a room or enter the ID from another player.'),
+		).toBeInTheDocument()
+	})
+
+	it('forgets the room and shows the entry form with focus on its heading', async () => {
+		const user = userEvent.setup()
+		const service = failingRestore()
+		render(OnlineMultiplayerGame, { props: { service } })
+
+		await user.click(
+			await screen.findByRole('button', { name: 'Forget this room' }),
+		)
+
+		expect(service.clearSession).toHaveBeenCalled()
+		expect(screen.getByLabelText('Display name')).toBeInTheDocument()
+		expect(screen.getByRole('alert').textContent?.trim()).toBe('')
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Play with friends.' }),
+			).toHaveFocus()
+		})
+	})
+
+	it('offers the same choice in Thai', async () => {
+		gameStore.setLocale('th')
+		render(OnlineMultiplayerGame, { props: { service: failingRestore() } })
+
+		expect(
+			await screen.findByRole('heading', { name: 'ห้องที่บันทึกไว้' }),
+		).toBeInTheDocument()
+		expect(screen.getByRole('alert')).toHaveTextContent('กู้คืนห้องไม่สำเร็จ')
+		expect(screen.getByRole('button', { name: 'ลองอีกครั้ง' })).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'ลืมห้องนี้' })).toBeInTheDocument()
+	})
 })

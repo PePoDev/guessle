@@ -52,12 +52,39 @@ describe('SettingsModal Component', () => {
 		)
 	})
 
-	it('warns that changing game options starts a new game', () => {
-		renderSettings('random')
+	it.each(['random', 'multi'] as const)(
+		'warns that changing %s options starts a new game',
+		(mode) => {
+			renderSettings(mode)
+
+			expect(
+				screen.getByText('Changing these options starts a new game.'),
+			).toBeInTheDocument()
+		},
+	)
+
+	it('says online options apply to the next room instead of restarting', () => {
+		renderSettings('online')
 
 		expect(
-			screen.getByText('Changing these options starts a new game.'),
+			screen.getByText('These options apply to the next room you create.'),
 		).toBeInTheDocument()
+		expect(
+			screen.queryByText('Changing these options starts a new game.'),
+		).not.toBeInTheDocument()
+	})
+
+	it('explains online options in Thai', () => {
+		gameStore.setLocale('th')
+
+		renderSettings('online')
+
+		expect(
+			screen.getByText('ตัวเลือกเหล่านี้จะใช้กับห้องถัดไปที่คุณสร้าง'),
+		).toBeInTheDocument()
+		expect(
+			screen.queryByText('การเปลี่ยนตัวเลือกเหล่านี้จะเริ่มเกมใหม่'),
+		).not.toBeInTheDocument()
 	})
 
 	it('offers only the language and sound once an online room starts', () => {
@@ -84,6 +111,9 @@ describe('SettingsModal Component', () => {
 		expect(screen.getByLabelText('Sound effects:')).toHaveValue('on')
 		expect(
 			screen.queryByText('Changing these options starts a new game.'),
+		).not.toBeInTheDocument()
+		expect(
+			screen.queryByText('These options apply to the next room you create.'),
 		).not.toBeInTheDocument()
 		expect(screen.queryByLabelText('Number of Digits:')).not.toBeInTheDocument()
 		expect(

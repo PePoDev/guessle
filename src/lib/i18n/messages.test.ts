@@ -84,6 +84,20 @@ describe('messages', () => {
 		expect(messages.th.settings.sound).toBe('เสียงประกอบ:')
 	})
 
+	it('introduces multiplayer with the players picking the secret numbers', () => {
+		for (const locale of ['en', 'th'] as const) {
+			const { localIntro, onlineIntro } = messages[locale].header
+			expect(localIntro(4)).toContainEqual({ value: 4 })
+			expect(onlineIntro(4)).toContainEqual({ value: 4 })
+		}
+		expect(messages.en.instructions.friendsSteps.join(' ')).not.toMatch(/everyone is ready/)
+	})
+
+	it('never tells a player that a failed command is reconnecting by itself', () => {
+		expect(messages.en.online.errors.CONNECTION_INTERRUPTED).not.toMatch(/Reconnecting/)
+		expect(messages.th.online.errors.CONNECTION_INTERRUPTED).not.toMatch(/กำลังเชื่อมต่อใหม่/)
+	})
+
 	it('describes guess problems in both languages', () => {
 		expect(messages.en.validation.range(3)).toBe(
 			'Please enter a number between 000 and 999.',

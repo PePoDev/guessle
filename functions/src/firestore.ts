@@ -60,6 +60,7 @@ export interface SecretDocument {
 
 export interface RateLimitDocument {
 	roomCreatedAt: Timestamp[]
+	expiresAt: Timestamp
 }
 
 export function roomRef(firestore: Firestore, roomId: string) {

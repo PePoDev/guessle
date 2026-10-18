@@ -109,6 +109,9 @@ export async function createRoom(
 			}
 			const limitUpdate: RateLimitDocument = {
 				roomCreatedAt: [...recentCreations, now],
+				// Once the newest creation leaves the window the document limits
+				// nothing, so the hourly cleanup can delete it from this field.
+				expiresAt: Timestamp.fromMillis(now.toMillis() + roomCreateWindowMillis),
 			}
 			transaction.create(room, roomData)
 			transaction.create(player, playerData)

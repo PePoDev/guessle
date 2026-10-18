@@ -1,7 +1,8 @@
 import { deleteApp, initializeApp } from 'firebase-admin/app'
 import { Timestamp, getFirestore } from 'firebase-admin/firestore'
 import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanupExpiredRooms } from './cleanup.js'
+import { cleanupExpiredRateLimits, cleanupExpiredRooms } from './cleanup.js'
+import { createRoom } from './roomCommands.js'
 
 const projectId = 'demo-number-guessing'
 const app = initializeApp({ projectId }, 'cleanup-tests')
@@ -38,6 +39,25 @@ async function seedRooms(rooms: Record<string, Timestamp>): Promise<void> {
 
 async function roomExists(roomId: string): Promise<boolean> {
 	return (await firestore.collection('rooms').doc(roomId).get()).exists
+}
+
+function rateLimitDoc(uid: string) {
+	return firestore.collection('rateLimits').doc(uid)
+}
+
+async function seedRateLimits(limits: Record<string, Timestamp>): Promise<void> {
+	const batch = firestore.batch()
+	for (const [uid, expiresAt] of Object.entries(limits)) {
+		batch.set(rateLimitDoc(uid), {
+			roomCreatedAt: [Timestamp.fromMillis(expiresAt.toMillis() - 3_600_000)],
+			expiresAt,
+		})
+	}
+	await batch.commit()
+}
+
+async function rateLimitIds(): Promise<string[]> {
+	return (await firestore.collection('rateLimits').get()).docs.map((limit) => limit.id)
 }
 
 beforeEach(clearFirestore)
@@ -113,4 +133,62 @@ it('deletes secrets before the room so an interrupted run can finish later', asy
 	vi.restoreAllMocks()
 	expect(await cleanupExpiredRooms(firestore, now)).toEqual(['EXPIRED'])
 	expect(await roomExists('EXPIRED')).toBe(false)
+})
+
+it('deletes only rate-limit documents whose window has passed', async () => {
+	await seedRateLimits({ old: expired, edge: now, fresh })
+
+	const deleted = await cleanupExpiredRateLimits(firestore, now)
+
+	expect([...deleted].sort()).toEqual(['edge', 'old'])
+	expect(await rateLimitIds()).toEqual(['fresh'])
+})
+
+it('pages through more expired rate limits than one query returns', async () => {
+	await seedRateLimits({
+		uid1: expired,
+		uid2: Timestamp.fromMillis(now.toMillis() - 2),
+		uid3: Timestamp.fromMillis(now.toMillis() - 3),
+		uid4: now,
+		uid5: expired,
+		fresh,
+	})
+
+	const deleted = await cleanupExpiredRateLimits(firestore, now, 2)
+
+	expect([...deleted].sort()).toEqual(['uid1', 'uid2', 'uid3', 'uid4', 'uid5'])
+	expect(await rateLimitIds()).toEqual(['fresh'])
+})
+
+it('keeps a rate limit that a new room refreshed after the query', async () => {
+	await seedRateLimits({ host: expired })
+	const runTransaction = firestore.runTransaction.bind(firestore)
+	vi.spyOn(firestore, 'runTransaction').mockImplementationOnce(
+		(async (update, options) => {
+			await rateLimitDoc('host').update({ expiresAt: fresh })
+			return runTransaction(update, options)
+		}) as typeof runTransaction,
+	)
+
+	const deleted = await cleanupExpiredRateLimits(firestore, now)
+
+	expect(deleted).toEqual([])
+	expect(await rateLimitIds()).toEqual(['host'])
+})
+
+it('deletes the limit a created room leaves once its hour has passed', async () => {
+	await createRoom(
+		'host',
+		{ name: 'Ada', digitCount: 3, maxPlayers: 2 },
+		{ firestore, now: () => now, roomIdFactory: () => 'AB2C3D' },
+	)
+
+	expect(
+		await cleanupExpiredRateLimits(firestore, Timestamp.fromMillis(now.toMillis() + 3_599_999)),
+	).toEqual([])
+	expect(
+		await cleanupExpiredRateLimits(firestore, Timestamp.fromMillis(now.toMillis() + 3_600_000)),
+	).toEqual(['host'])
+	expect(await rateLimitIds()).toEqual([])
+	expect(await roomExists('AB2C3D')).toBe(true)
 })

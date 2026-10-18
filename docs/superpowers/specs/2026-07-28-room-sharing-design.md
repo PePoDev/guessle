@@ -1,3 +1,5 @@
+> Superseded: this is a dated spec kept for history. README.md is the source of truth; later changes include the move from `number-guesser.pepo.dev` to `guessle.pepo.dev` and the Guessle name in invites.
+
 # Online Room Sharing Design
 
 **Date:** 2026-07-28

@@ -51,6 +51,16 @@ const en = {
 			{ value: tries },
 			' tries. Everyone gets the same one.',
 		],
+		localIntro: (digits: number): RichText => [
+			'Each player picks a secret ',
+			{ value: digits },
+			'-digit number, then you pass the device and take turns guessing.',
+		],
+		onlineIntro: (digits: number): RichText => [
+			'Each player picks a secret ',
+			{ value: digits },
+			'-digit number, then you take turns guessing from your own devices.',
+		],
 		singleType: 'Single-player type',
 		dailyMode: 'Daily',
 		random: 'Random',
@@ -61,9 +71,9 @@ const en = {
 	},
 	instructions: {
 		heading: 'How to Play:',
-		steps: [
-			{ text: 'Choose your preferred number of digits (2-5) and max attempts (3-20)' },
-			{ text: 'Guess the number within your attempt limit' },
+		randomSteps: [
+			{ text: 'Choose 2–5 digits and 3–20 attempts in Settings.' },
+			{ text: 'Guess the number before your attempts run out.' },
 			{
 				term: 'Correct Digits:',
 				text: 'How many digits are in the target number (regardless of position)',
@@ -74,11 +84,11 @@ const en = {
 			},
 			{ text: 'Example: Target is 401, you guess 410 → 3 correct digits, 1 correct position' },
 			{
-				text: 'In Random, each guess stays on the board with both hints beside it: yellow counts the digits in the number, green the digits in the right spot.',
+				text: 'Each guess stays on the board with both hints beside it: yellow counts the digits in the number, green the digits in the right spot.',
 			},
 		] as InstructionStep[],
 		dailyHeading: 'Daily Guessle:',
-		randomHeading: 'Random and multiplayer:',
+		randomHeading: 'Random:',
 		dailySteps: [
 			{ text: 'Everyone gets the same 3-digit number each day and has 6 tries.' },
 			{ term: 'Green:', text: 'the digit is in the right spot.' },
@@ -93,10 +103,11 @@ const en = {
 		] as InstructionStep[],
 		friendsHeading: 'Playing with friends:',
 		friendsSteps: [
+			'Choose 2–5 digits in Settings. There is no attempt limit.',
 			'Each player picks a secret number. On one device, pass it around and keep your number hidden.',
-			"Take turns guessing another player's number. Every guess gets the same digit and position hints.",
+			"Take turns guessing another player's number. Every guess gets the same digit and position hints as Random.",
 			'Guess a number exactly to knock that player out. The last player standing wins.',
-			'Online: create a room, share its ID or link, and the host starts once everyone is ready.',
+			"Online: create a room and share its ID or link. The host can start once at least two players, the host included, are ready; anyone who isn't ready is left out.",
 		],
 	},
 	footer: {
@@ -128,6 +139,7 @@ const en = {
 		soundOn: 'On',
 		soundOff: 'Off',
 		restartHint: 'Changing these options starts a new game.',
+		nextRoomHint: 'These options apply to the next room you create.',
 	},
 	validation: {
 		invalid: () => 'Please enter a valid number.',
@@ -272,6 +284,10 @@ const en = {
 		playAgain: 'Play Again',
 		waitingForHost: 'Waiting for the host to restart.',
 		unknownPlayer: 'Player',
+		restoreHeading: 'Your saved room',
+		restoreHint: 'Try again, or forget this room to create or join another one.',
+		tryAgain: 'Try again',
+		forgetRoom: 'Forget this room',
 		errors: {
 			AUTH_REQUIRED: 'Could not sign in. Please retry.',
 			NAME_INVALID: 'Enter a name between 1 and 20 characters.',
@@ -291,7 +307,7 @@ const en = {
 			TARGET_INVALID: 'Choose an active opponent.',
 			TARGET_ELIMINATED: 'That player has already been eliminated.',
 			ONLINE_GAME_INTERNAL: 'Something went wrong. Please retry.',
-			CONNECTION_INTERRUPTED: 'Connection interrupted. Reconnecting…',
+			CONNECTION_INTERRUPTED: "Couldn't reach the game server. Check your connection and try again.",
 			ROOM_CHANGED: 'The room changed. Please retry.',
 			RESTORE_FAILED: 'Could not restore the room.',
 			CLIPBOARD_FAILED: 'Could not copy. Please copy it manually.',
@@ -300,6 +316,19 @@ const en = {
 			ROOM_CREATE_LIMIT: "You've created a lot of rooms. Try again in a little while.",
 			TURN_NOT_IDLE: 'That player still has time to take their turn.',
 		} satisfies Record<OnlineErrorCode, string>,
+	},
+	errorPage: {
+		notFound: {
+			heading: 'Page not found',
+			documentTitle: 'Page not found · Guessle',
+			text: "There's nothing at this address. Head back to the game to keep playing.",
+		},
+		failed: {
+			heading: 'Something went wrong',
+			documentTitle: 'Something went wrong · Guessle',
+			text: "This page couldn't load. Head back to the game and try again.",
+		},
+		home: 'Back to the game',
 	},
 }
 
@@ -344,6 +373,16 @@ const th: Messages = {
 			{ value: tries },
 			' ครั้ง ทุกคนได้เลขเดียวกัน',
 		],
+		localIntro: (digits) => [
+			'ผู้เล่นแต่ละคนตั้งเลขลับ ',
+			{ value: digits },
+			' หลัก แล้วส่งเครื่องต่อกันผลัดกันทาย',
+		],
+		onlineIntro: (digits) => [
+			'ผู้เล่นแต่ละคนตั้งเลขลับ ',
+			{ value: digits },
+			' หลัก แล้วผลัดกันทายจากเครื่องของตัวเอง',
+		],
 		singleType: 'รูปแบบการเล่นคนเดียว',
 		dailyMode: 'รายวัน',
 		random: 'สุ่ม',
@@ -354,9 +393,9 @@ const th: Messages = {
 	},
 	instructions: {
 		heading: 'วิธีเล่น:',
-		steps: [
-			{ text: 'เลือกจำนวนหลัก (2–5) และจำนวนครั้งที่ทายได้ (3–20)' },
-			{ text: 'ทายตัวเลขให้ถูกภายในจำนวนครั้งที่กำหนด' },
+		randomSteps: [
+			{ text: 'เลือกจำนวนหลัก (2–5) และจำนวนครั้งที่ทายได้ (3–20) ในการตั้งค่า' },
+			{ text: 'ทายตัวเลขให้ถูกก่อนโอกาสทายจะหมด' },
 			{
 				term: 'เลขถูก:',
 				text: 'จำนวนตัวเลขที่มีอยู่ในคำตอบ (ไม่สนตำแหน่ง)',
@@ -367,11 +406,11 @@ const th: Messages = {
 			},
 			{ text: 'ตัวอย่าง: คำตอบคือ 401 ถ้าทาย 410 → เลขถูก 3 ตัว ตำแหน่งถูก 1 ตัว' },
 			{
-				text: 'ในโหมดสุ่ม คำทายแต่ละครั้งจะอยู่บนกระดานพร้อมคำใบ้สองช่อง: สีเหลืองบอกจำนวนเลขที่มีในคำตอบ สีเขียวบอกจำนวนเลขที่อยู่ถูกตำแหน่ง',
+				text: 'คำทายแต่ละครั้งจะอยู่บนกระดานพร้อมคำใบ้สองช่อง: สีเหลืองบอกจำนวนเลขที่มีในคำตอบ สีเขียวบอกจำนวนเลขที่อยู่ถูกตำแหน่ง',
 			},
 		],
 		dailyHeading: 'Guessle รายวัน:',
-		randomHeading: 'โหมดสุ่มและเล่นหลายคน:',
+		randomHeading: 'โหมดสุ่ม:',
 		dailySteps: [
 			{ text: 'ทุกคนได้เลข 3 หลักชุดเดียวกันในแต่ละวัน และทายได้ 6 ครั้ง' },
 			{ term: 'สีเขียว:', text: 'เลขนี้อยู่ถูกตำแหน่ง' },
@@ -381,10 +420,11 @@ const th: Messages = {
 		],
 		friendsHeading: 'เล่นกับเพื่อน:',
 		friendsSteps: [
+			'เลือกจำนวนหลัก (2–5) ในการตั้งค่า ไม่จำกัดจำนวนครั้งที่ทาย',
 			'ผู้เล่นแต่ละคนตั้งเลขลับของตัวเอง ถ้าเล่นในเครื่องเดียว ให้ส่งเครื่องต่อกันและอย่าให้คนอื่นเห็นเลข',
-			'ผลัดกันทายเลขของผู้เล่นคนอื่น ทุกครั้งที่ทายจะบอกเลขถูกและตำแหน่งถูกเหมือนกัน',
+			'ผลัดกันทายเลขของผู้เล่นคนอื่น ทุกครั้งที่ทายจะบอกเลขถูกและตำแหน่งถูกเหมือนโหมดสุ่ม',
 			'ทายเลขของใครถูกทั้งหมด ผู้เล่นคนนั้นจะตกรอบ คนสุดท้ายที่เหลืออยู่คือผู้ชนะ',
-			'ออนไลน์: สร้างห้อง แชร์รหัสห้องหรือลิงก์ แล้วเจ้าของห้องกดเริ่มเมื่อทุกคนพร้อม',
+			'ออนไลน์: สร้างห้องแล้วแชร์รหัสห้องหรือลิงก์ เมื่อมีผู้เล่นพร้อมอย่างน้อยสองคนรวมเจ้าของห้อง เจ้าของห้องก็เริ่มเกมได้ ใครยังไม่พร้อมจะไม่ได้ร่วมเล่นรอบนั้น',
 		],
 	},
 	footer: {
@@ -415,6 +455,7 @@ const th: Messages = {
 		soundOn: 'เปิด',
 		soundOff: 'ปิด',
 		restartHint: 'การเปลี่ยนตัวเลือกเหล่านี้จะเริ่มเกมใหม่',
+		nextRoomHint: 'ตัวเลือกเหล่านี้จะใช้กับห้องถัดไปที่คุณสร้าง',
 	},
 	validation: {
 		invalid: () => 'กรุณากรอกตัวเลขให้ถูกต้อง',
@@ -550,6 +591,10 @@ const th: Messages = {
 		playAgain: 'เล่นอีกครั้ง',
 		waitingForHost: 'รอเจ้าของห้องเริ่มเกมใหม่',
 		unknownPlayer: 'ผู้เล่น',
+		restoreHeading: 'ห้องที่บันทึกไว้',
+		restoreHint: 'ลองอีกครั้ง หรือลืมห้องนี้เพื่อสร้างหรือเข้าห้องอื่น',
+		tryAgain: 'ลองอีกครั้ง',
+		forgetRoom: 'ลืมห้องนี้',
 		errors: {
 			AUTH_REQUIRED: 'ลงชื่อเข้าใช้ไม่สำเร็จ กรุณาลองใหม่',
 			NAME_INVALID: 'ใส่ชื่อยาว 1–20 ตัวอักษร',
@@ -569,7 +614,7 @@ const th: Messages = {
 			TARGET_INVALID: 'เลือกคู่แข่งที่ยังอยู่ในเกม',
 			TARGET_ELIMINATED: 'ผู้เล่นคนนั้นตกรอบไปแล้ว',
 			ONLINE_GAME_INTERNAL: 'เกิดข้อผิดพลาด กรุณาลองใหม่',
-			CONNECTION_INTERRUPTED: 'การเชื่อมต่อขาดหาย กำลังเชื่อมต่อใหม่…',
+			CONNECTION_INTERRUPTED: 'เชื่อมต่อเซิร์ฟเวอร์เกมไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง',
 			ROOM_CHANGED: 'ห้องมีการเปลี่ยนแปลง กรุณาลองใหม่',
 			RESTORE_FAILED: 'กู้คืนห้องไม่สำเร็จ',
 			CLIPBOARD_FAILED: 'คัดลอกไม่สำเร็จ กรุณาคัดลอกเอง',
@@ -578,6 +623,19 @@ const th: Messages = {
 			ROOM_CREATE_LIMIT: 'คุณสร้างห้องหลายครั้งแล้ว ลองใหม่อีกสักพักนะ',
 			TURN_NOT_IDLE: 'ผู้เล่นคนนั้นยังมีเวลาเล่นตาของตัวเองอยู่',
 		},
+	},
+	errorPage: {
+		notFound: {
+			heading: 'ไม่พบหน้านี้',
+			documentTitle: 'ไม่พบหน้านี้ · Guessle',
+			text: 'ไม่มีหน้าเว็บตามที่อยู่นี้ กลับไปที่เกมเพื่อเล่นต่อได้เลย',
+		},
+		failed: {
+			heading: 'เกิดข้อผิดพลาด',
+			documentTitle: 'เกิดข้อผิดพลาด · Guessle',
+			text: 'โหลดหน้านี้ไม่สำเร็จ กลับไปที่เกมแล้วลองใหม่อีกครั้ง',
+		},
+		home: 'กลับไปที่เกม',
 	},
 }
 

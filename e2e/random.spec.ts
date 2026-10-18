@@ -195,7 +195,7 @@ test('keeps the game through Settings and Instructions', async ({
 	await page.getByRole('button', { name: 'Open Random settings' }).click()
 	await page.getByRole('button', { name: 'Close', exact: true }).click()
 	await page.getByRole('button', { name: /Instructions/ }).click()
-	await expect(page.getByRole('heading', { name: 'Random and multiplayer:' })).toBeVisible()
+	await expect(page.getByRole('heading', { name: 'Random:' })).toBeVisible()
 	await page.getByRole('button', { name: /Instructions/ }).click()
 	await expect(page.getByRole('heading', { name: 'How to Play:' })).toBeHidden()
 	await expect(board).toContainText('Guess 1: 1 2 3')

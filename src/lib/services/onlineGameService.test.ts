@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
 	createOnlineGameService,
 	decodeOnlineSnapshot,
@@ -131,6 +131,53 @@ describe('online game service', () => {
 			}),
 		).toBe('ROOM_NOT_FOUND')
 		expect(mapOnlineGameError('offline')).toBe('ONLINE_GAME_INTERNAL')
+	})
+
+	// What @firebase/functions throws when the browser's fetch rejects, as it
+	// does for an undeployed function whose 404 has no CORS headers: SDK 0.13
+	// says 'internal', and 0.14 appends the HTTP status.
+	describe.each(['internal', 'internal [0]'])('when the callable cannot be reached (%s)', (message) => {
+		const unreachable = { code: 'functions/internal', message }
+
+		afterEach(() => {
+			vi.restoreAllMocks()
+		})
+
+		it('reports a missing backend as unavailable while the browser is online', () => {
+			vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+
+			expect(mapOnlineGameError(unreachable)).toBe('ONLINE_UNAVAILABLE')
+		})
+
+		it('reports a lost connection while the browser is offline', () => {
+			vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+
+			expect(mapOnlineGameError(unreachable)).toBe('CONNECTION_INTERRUPTED')
+			expect(
+				mapOnlineGameError({
+					code: 'auth/network-request-failed',
+					message: 'Firebase: Error (auth/network-request-failed).',
+				}),
+			).toBe('CONNECTION_INTERRUPTED')
+		})
+
+		it('keeps failures the server reports as retryable', () => {
+			vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+
+			expect(
+				mapOnlineGameError({
+					code: 'functions/internal',
+					message: 'ONLINE_GAME_INTERNAL',
+				}),
+			).toBe('ONLINE_GAME_INTERNAL')
+			expect(
+				mapOnlineGameError({ code: 'functions/internal', message: 'INTERNAL' }),
+			).toBe('ONLINE_GAME_INTERNAL')
+			// A backend that answered, even with an unhandled 500, is not missing.
+			expect(
+				mapOnlineGameError({ code: 'functions/internal', message: 'internal [500]' }),
+			).toBe('ONLINE_GAME_INTERNAL')
+		})
 	})
 
 	it('authenticates before creating a room and stores the room id', async () => {

@@ -341,7 +341,7 @@ describe("+page.svelte Component", () => {
     render(Page);
     await user.click(screen.getByRole("button", { name: /Instructions/ }));
     expect(
-      screen.getByText(/Choose your preferred number of digits/)
+      screen.getByText("Choose 2–5 digits and 3–20 attempts in Settings.")
     ).toBeInTheDocument();
     expect(screen.getByText(/Correct Digits:/)).toBeInTheDocument();
     expect(screen.getByText(/Correct Positions:/)).toBeInTheDocument();
@@ -656,11 +656,61 @@ describe("+page.svelte Component", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Yellow with a dot:")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Random and multiplayer:" })
+      screen.getByRole("heading", { name: "Random:" })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: /Classic/ })
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the attempt limit under Random and the multiplayer rules under friends", async () => {
+    const user = userEvent.setup();
+    render(Page);
+    await user.click(screen.getByRole("button", { name: /Instructions/ }));
+
+    const sections = screen.getAllByRole("list");
+    const random = within(sections[1]);
+    const friends = within(sections[2]);
+    expect(
+      screen.getByRole("heading", { name: "Random:" }).nextElementSibling
+    ).toBe(sections[1]);
+    expect(random.getByText(/3–20 attempts/)).toBeInTheDocument();
+    expect(random.getByText(/before your attempts run out/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Playing with friends:" }).nextElementSibling
+    ).toBe(sections[2]);
+    expect(
+      friends.getByText("Choose 2–5 digits in Settings. There is no attempt limit.")
+    ).toBeInTheDocument();
+    expect(friends.queryByText(/attempts/)).not.toBeInTheDocument();
+    expect(friends.getByText(/The last player standing wins/)).toBeInTheDocument();
+    expect(
+      friends.getByText(
+        "Online: create a room and share its ID or link. The host can start once at least two players, the host included, are ready; anyone who isn't ready is left out."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/once everyone is ready/)).not.toBeInTheDocument();
+  });
+
+  it("introduces local multiplayer as players choosing the secret numbers", () => {
+    gameStore.setMode("multi");
+    gameStore.startNewGame();
+    render(Page);
+
+    expect(screen.getByText(/Each player picks a secret/)).toHaveTextContent(
+      "Each player picks a secret 3-digit number, then you pass the device and take turns guessing."
+    );
+    expect(screen.queryByText(/I'm thinking of a/)).not.toBeInTheDocument();
+  });
+
+  it("introduces online multiplayer as players choosing the secret numbers", () => {
+    gameStore.setMode("online");
+    render(Page);
+
+    expect(screen.getByText(/Each player picks a secret/)).toHaveTextContent(
+      "Each player picks a secret 3-digit number, then you take turns guessing from your own devices."
+    );
+    expect(screen.queryByText(/I'm thinking of a/)).not.toBeInTheDocument();
   });
 
   it("should display game info with correct styling", () => {
@@ -756,9 +806,33 @@ describe('+page.svelte in Thai', () => {
 			screen.getByRole('heading', { name: 'วิธีเล่น:' }),
 		).toBeInTheDocument()
 		expect(
-			screen.getByRole('heading', { name: 'โหมดสุ่มและเล่นหลายคน:' }),
+			screen.getByRole('heading', { name: 'โหมดสุ่ม:' }),
 		).toBeInTheDocument()
 		expect(screen.getByText('เลขถูก:')).toBeInTheDocument()
+		expect(
+			screen.getByText('เลือกจำนวนหลัก (2–5) ในการตั้งค่า ไม่จำกัดจำนวนครั้งที่ทาย'),
+		).toBeInTheDocument()
+		expect(screen.getByText(/อย่างน้อยสองคนรวมเจ้าของห้อง/)).toBeInTheDocument()
+	})
+
+	it('introduces both multiplayer modes in Thai', async () => {
+		gameStore.setLocale('th')
+		gameStore.setMode('multi')
+		gameStore.startNewGame()
+		render(Page)
+
+		expect(screen.getByText(/ผู้เล่นแต่ละคนตั้งเลขลับ/)).toHaveTextContent(
+			'ผู้เล่นแต่ละคนตั้งเลขลับ 3 หลัก แล้วส่งเครื่องต่อกันผลัดกันทาย',
+		)
+
+		gameStore.setMode('online')
+
+		await waitFor(() => {
+			expect(screen.getByText(/ผู้เล่นแต่ละคนตั้งเลขลับ/)).toHaveTextContent(
+				'ผู้เล่นแต่ละคนตั้งเลขลับ 3 หลัก แล้วผลัดกันทายจากเครื่องของตัวเอง',
+			)
+		})
+		expect(screen.queryByText(/ฉันคิดตัวเลข/)).not.toBeInTheDocument()
 	})
 
 	it('introduces Guessle in Thai', () => {

@@ -207,8 +207,12 @@
 					{#if !showInstructions}
 						{#if $gameStore.mode === 'daily'}
 							<p class="short:sr-only">{@render rich(t.header.daily(DAILY_DIGITS, DAILY_TRIES))}</p>
+						{:else if $gameStore.mode === 'random'}
+							<p class="short:sr-only">{@render rich(t.header.thinking(displayedDigitCount))}</p>
+						{:else if $gameStore.mode === 'multi'}
+							<p>{@render rich(t.header.localIntro(displayedDigitCount))}</p>
 						{:else}
-							<p class={singleMode ? 'short:sr-only' : ''}>{@render rich(t.header.thinking(displayedDigitCount))}</p>
+							<p>{@render rich(t.header.onlineIntro(displayedDigitCount))}</p>
 						{/if}
 						<!-- Single-player boards set the switch beside their heading to save a row. -->
 						{#if !singleMode}
@@ -228,7 +232,7 @@
 						<h3 class="font-display text-lg font-bold">{t.instructions.dailyHeading}</h3>
 						{@render steps(t.instructions.dailySteps)}
 						<h3 class="font-display text-lg font-bold">{t.instructions.randomHeading}</h3>
-						{@render steps(t.instructions.steps)}
+						{@render steps(t.instructions.randomSteps)}
 						<h3 class="font-display text-lg font-bold">{t.instructions.friendsHeading}</h3>
 						<ul class="list-disc space-y-2 pl-5 text-sm">
 							{#each t.instructions.friendsSteps as step}

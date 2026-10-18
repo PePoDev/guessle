@@ -26,9 +26,40 @@ async function readRoomId(page: Page): Promise<string> {
 	return roomId
 }
 
+const callables = [
+	'createRoom',
+	'joinRoom',
+	'setSecret',
+	'startRoom',
+	'submitGuess',
+	'leaveRoom',
+	'restartRoom',
+	'removeIdlePlayer',
+]
+
+// The Functions emulator boots a worker the first time each function is
+// called, which takes seconds; paying that here keeps it out of the tests'
+// waits. An unauthenticated call is enough, and the 401 shows the code ran.
+test.beforeAll(async ({ playwright }) => {
+	test.setTimeout(120_000)
+	const api = await playwright.request.newContext({
+		baseURL: 'http://127.0.0.1:5001/demo-number-guessing/asia-southeast1/',
+	})
+	const statuses = await Promise.all(
+		callables.map(async (name) => {
+			const response = await api.post(name, { data: { data: {} } })
+			return response.status()
+		}),
+	)
+	await api.dispose()
+	expect(statuses).toEqual(callables.map(() => 401))
+})
+
 test('two remote players create, join, play, and finish a room', async ({
 	browser,
 }) => {
+	// The first test also pays for the dev server's first load of the online code.
+	test.slow()
 	const hostContext = await browser.newContext()
 	const guestContext = await browser.newContext()
 	const host = await hostContext.newPage()

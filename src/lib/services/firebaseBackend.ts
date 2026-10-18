@@ -9,13 +9,29 @@ import {
 	type RawSnapshot,
 } from './onlineGameService'
 
+// With App Check on, the SDKs wait for a reCAPTCHA token before sending, and
+// the Functions SDK starts its own 70-second timeout only after that; if
+// reCAPTCHA never loads (a blocker, a flaky network), a command would hang
+// with every control disabled. This backstop gives up just after the SDK would.
+export const COMMAND_TIMEOUT_MS = 80_000
+
+function withTimeout<T>(work: Promise<T>): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined
+	const timeout = new Promise<never>((_, reject) => {
+		timer = setTimeout(() => {
+			reject(Object.assign(new Error('unavailable'), { code: 'functions/unavailable' }))
+		}, COMMAND_TIMEOUT_MS)
+	})
+	return Promise.race([work, timeout]).finally(() => clearTimeout(timer))
+}
+
 export async function ensureFirebaseUser(): Promise<string> {
 	const { auth } = await getFirebaseClient()
 	await auth.authStateReady()
 	if (auth.currentUser) {
 		return auth.currentUser.uid
 	}
-	return (await signInAnonymously(auth)).user.uid
+	return (await withTimeout(signInAnonymously(auth))).user.uid
 }
 
 export async function callFirebase(
@@ -24,10 +40,9 @@ export async function callFirebase(
 ): Promise<unknown> {
 	const { functions } = await getFirebaseClient()
 	return (
-		await httpsCallable<Record<string, unknown>, unknown>(
-			functions,
-			name,
-		)(input)
+		await withTimeout(
+			httpsCallable<Record<string, unknown>, unknown>(functions, name)(input),
+		)
 	).data
 }
 

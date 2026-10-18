@@ -19,8 +19,10 @@ Example: target `401`, guess `410` → 3 correct digits and 1 correct position.
 
 - **Guessle (daily single player):** The default mode. Everyone gets the same 3-digit number on the same local date and has 6 tries. Each guessed digit becomes a tile: green when it is in the right spot, yellow with a dot when it is in the number but in another spot, and gray when it is not in the number. As in Wordle, a repeated digit turns yellow only while the answer still has an unmatched copy of it; extra copies are gray. Repeated guesses are rejected without using a try. A finished puzzle cannot be replayed; the next one arrives at local midnight. Results share as an emoji grid that shows colors, not digits.
 - **Random (single player):** For players who want more than the daily puzzle. Every game draws a new random number and plays on the same board and keypad as Guessle, but each guessed row keeps its digits plain and shows the hints beside it: how many digits are in the number and how many are in the right spot. Settings choose 2–5 digits (3 by default) and 3–20 attempts (7 by default). Repeated guesses are rejected without using a try, and Play again, switching back from Guessle, or changing the settings draws a fresh number.
-- **Local multiplayer:** Two to four players share one device, choose names and secret numbers, and take turns guessing.
+- **Local multiplayer:** Two to four players share one device, choose names and secret numbers, and take turns guessing. There is no attempt limit; a player whose number is guessed is out, and the last player standing wins.
 - **Online multiplayer:** Two to four remote players enter display names, create or join a room with a six-character ID or invite link, and reconnect after refresh. The host can start once at least two players are ready; anyone not ready is left out. Leaving mid-match forfeits, and if the player whose turn it is stays idle for two minutes, the others can remove them. Firebase keeps secrets private and enforces turns on the server.
+
+The line under the title says what the active mode asks of the player: today's number in Guessle, the hidden number in Random, and each player's secret number in local and online multiplayer. How to Play has separate Daily, Random, and multiplayer sections, so the attempt limit appears only under Random, and its online step matches the start rule above.
 
 Secret-number and guess fields read Thai numerals (๐–๙) as digits, discard other non-digits, and stop at the configured digit count. Every mode requires exactly that many digits; nothing is padded.
 
@@ -49,7 +51,7 @@ A win in Guessle or Random sets off a short confetti burst and a rising four-not
 | End-to-end tests | Playwright with Chromium |
 | Online backend | Firebase Anonymous Auth, Firestore, callable Functions, Admin SDK |
 | Firebase tests | Firebase Emulator Suite |
-| Hosting | GitHub Pages at `guessle.pepo.dev` |
+| Hosting | GitHub Pages behind Cloudflare at `guessle.pepo.dev` |
 | Localization | English and Thai, typed in-house dictionaries; no i18n dependency |
 
 GitHub Pages serves the static SvelteKit client. Callable Cloud Functions own authoritative online commands; Firestore publishes member-only room projections.
@@ -95,6 +97,8 @@ For online development, install Java 21, then run `pnpm firebase:emulators` and 
 src/routes/
   +layout.svelte               Global styles, locale detection, and <html lang>
   +page.svelte                 Stage and component composition
+  +error.svelte                Page not found and error screen
+src/hooks.server.ts            Rocket Loader opt-out on every rendered page's scripts
 src/lib/components/
   DailyGame.svelte             Guessle board, stats, and sharing
   RandomGame.svelte            Random board with digit and position hints
@@ -102,6 +106,7 @@ src/lib/components/
   MultiPlayerGame.svelte       Multiplayer UI
   OnlineMultiplayerGame.svelte Online room entry, lobby, and synchronized game
   SettingsModal.svelte         Active-mode settings dialog
+  ErrorScreen.svelte           Page not found and error panel on the stage grid
   GitHubStarLink.svelte        Repository link and best-effort live star count
 src/lib/stores/
   gameStore.ts                 All shared game state and logic
@@ -139,7 +144,7 @@ Online rooms are server-authoritative:
 - `turnStartedAt` marks when the current turn began. `removeIdlePlayer` forfeits the current guesser after `IDLE_TURN_SECONDS` (120).
 - Leaving mid-match forfeits: the player stays in the room with `eliminated` and `left` set, so names and history survive. Restart removes players who left.
 - `createRoom` allows 10 rooms per user per rolling hour, tracked in server-only `rateLimits/{uid}`.
-- The hourly cleanup deletes expired rooms in pages of 200. It re-checks each room in a transaction and deletes its secrets before the room, so an interrupted run never orphans secrets.
+- The hourly cleanup deletes expired rooms in pages of 200. It re-checks each room in a transaction and deletes its secrets before the room, so an interrupted run never orphans secrets. It then deletes, in the same pages, `rateLimits` documents whose `expiresAt` (an hour after the user's latest room) has passed, re-checking each in a transaction so a room created meanwhile still counts.
 
 ## Localization
 
@@ -193,6 +198,7 @@ Firebase dependencies and backend deployment are explicitly approved for online 
 - A new visual token, surface, state, or interaction must update the Design system and its file map in the same change.
 - A new test pattern or layout must update Testing in the same change.
 - If this README is silent, document the decision before implementing it.
+- The plans and specs in `docs/superpowers/` are dated history and carry a superseded note; never follow them over this README.
 
 ## Testing
 
@@ -200,10 +206,12 @@ Firebase dependencies and backend deployment are explicitly approved for online 
 | --- | --- | --- |
 | Unit | `src/lib/stores/gameStore.test.ts` | Pure helpers, state transitions, edge cases |
 | Component | Colocated `*.test.ts` files | Rendering, interaction, ARIA, component branches |
-| End-to-end | `e2e/*.spec.ts` | Complete Guessle, Random, and multiplayer flows; `daily.spec.ts` covers a win with confetti, a loss, saved progress, sharing, the next day, and a fresh Random game after Guessle; `random.spec.ts` covers hints, a win, a loss, settings, keeping the game through Settings and Instructions, keyboard focus on the switch, Thai copy, and the saved sound setting; `localization.spec.ts` covers Thai browser detection and the saved language; `layout.spec.ts` checks at real window sizes that the stage adapts between phone, tablet, and desktop, the page never scrolls from 540px tall, Guessle and Random in play fit without panel scroll from 720px tall at desktop widths and from 740px tall below 900px wide, a taller window never gives a finished Guessle less room, warnings never resize the board, each screen opens at its top, and the panel and a long Random board scroll instead |
-| Firebase integration | `functions/src/*.test.ts`, `src/lib/firebase/firestore.rules.test.ts` | Emulator-only transactions, cleanup, and security rules |
-| Online end-to-end | `e2e/online-multiplayer.spec.ts` | Separate browser contexts for create/join, turns, host and invited-player reconnect, forfeit, starting without unready players, and errors |
-| Deployment | `src/tests/deploymentWorkflows.test.ts` | Secret injection, missing-config guard, and Java runtime requirements |
+| End-to-end | `e2e/*.spec.ts` | Complete Guessle, Random, and multiplayer flows; `daily.spec.ts` covers a win with confetti, a loss, saved progress, sharing, the next day, and a fresh Random game after Guessle; `random.spec.ts` covers hints, a win, a loss, settings, keeping the game through Settings and Instructions, keyboard focus on the switch, Thai copy, and the saved sound setting; `localization.spec.ts` covers Thai browser detection and the saved language; `layout.spec.ts` checks at real window sizes that the stage adapts between phone, tablet, and desktop, the page never scrolls from 540px tall, Guessle and Random in play fit without panel scroll from 720px tall at desktop widths and from 740px tall below 900px wide, a taller window never gives a finished Guessle less room, warnings never resize the board, each screen opens at its top, and the panel and a long Random board scroll instead; on a 390 × 844 phone, local multiplayer keeps the focused guess field and Submit Guess inside the panel after each guess |
+| Firebase integration | `functions/src/*.test.ts`, `src/lib/firebase/firestore.rules.test.ts` | Emulator-only transactions, cleanup (including expired rate-limit documents), App Check enforcement, and security rules |
+| Online end-to-end | `e2e/online-multiplayer.spec.ts` | Separate browser contexts for create/join, turns, host and invited-player reconnect, forfeit, starting without unready players, and errors; the tests run one at a time because they share one emulator, and a warm-up call to every function before the first test keeps the emulator's cold starts out of their timeouts |
+| Online without a backend | `e2e/online-unavailable.spec.ts` | Runs in the normal suite with no emulators: the spec answers every Firebase request itself, signs players in with a stub, and blocks each callable's 404 by CORS, as a browser does for an undeployed function. The unavailable message shows in English and Thai and takes focus, going offline shows the connection message, and a saved room that cannot be restored can be retried or forgotten. Playwright adds an allow-origin header to fulfilled responses that lack one, so a response meant to fail CORS must allow another origin instead |
+| Not found | `e2e/not-found.spec.ts`, `src/lib/components/ErrorScreen.test.ts` | An unknown path answers 404 with the Page not found screen, in English and Thai, whose link returns to the game; other statuses show a generic error |
+| Deployment | `src/tests/deploymentWorkflows.test.ts`, `src/hooks.server.test.ts` | Secret injection, missing-config guard, the optional App Check site key, Java runtime requirements, the non-interactive `--force` backend deploy and its `ENFORCE_APP_CHECK` setting, the Online tests workflow, and the Rocket Loader opt-out on the page's scripts |
 | Link previews | `src/tests/linkPreview.test.ts`, `e2e/link-preview.spec.ts` | Static title, description, Open Graph and X card tags with absolute image URLs; share image and icon sizes and file weight; the files served at those paths |
 | Localization | `src/lib/i18n/*.test.ts` | Locale resolution, persistence, and dictionary parity |
 | Guessle storage | `src/lib/daily/progress.test.ts` | Reading, validating, and saving progress and stats, including guesses saved before the 3-digit switch |
@@ -227,6 +235,8 @@ Firebase dependencies and backend deployment are explicitly approved for online 
 - Give every online player a separate Playwright browser context.
 
 ### Coverage goals
+
+`pnpm test:coverage` measures only `src/` and fails when a goal is missed. Coverage runs give each test 30 seconds, because instrumentation slows the page suite.
 
 | Metric | Goal |
 | --- | --- |
@@ -350,8 +360,9 @@ The main display heading is the Guessle wordmark: "Guess" followed by "le." in t
 | Result banner | Final win/lose message; takes focus when the game ends, so a win's confetti and chime arrive with the announcement |
 | History row | Translucent white; newest row has a purple left border; used by the multiplayer player cards, the online lobby, and the online guess history |
 | Player card | Landscape nav-card language; inset turn border; red-tinted eliminated state and visible badge; newest guess first; a finished game offers Play again, which keeps player names |
-| Online multiplayer | One cream-panel flow: name/create/join entry, room-ID lobby with paired Copy and Share actions, accessible confirmation tooltips, readiness, turn/guess state, reconnect status, and host restart; a two-step Leave game that forfeits, a warning banner offering to remove a player idle for two minutes, and players who left labelled Left |
-| Settings modal | Active-mode title and fields with a note that changing them starts a new game, then a Language select whose options are written in their own language with a matching `lang`, then a Sound effects On/Off select; cream surface, 480px maximum, blurred 40% black scrim, focus trap, and viewport-bounded scrolling |
+| Online multiplayer | One cream-panel flow: name/create/join entry, room-ID lobby with paired Copy and Share actions, accessible confirmation tooltips, readiness, turn/guess state, reconnect status, and host restart; a two-step Leave game that forfeits, a warning banner offering to remove a player idle for two minutes, and players who left labelled Left; a failed command's error takes focus, and a saved room that cannot be restored offers Try again and Forget this room |
+| Not found | The stage's grid field with one cream panel: the wordmark, a localized Page not found heading (Something went wrong for other errors), a short explanation, and a primary link back to the game |
+| Settings modal | Active-mode title and fields with a note that changing them starts a new game (online, that they apply to the next room you create), then a Language select whose options are written in their own language with a matching `lang`, then a Sound effects On/Off select; cream surface, 480px maximum, blurred 40% black scrim, focus trap, and viewport-bounded scrolling |
 | Hero | Decorative CSS/SVG tile tunnel with `aria-hidden="true"` |
 | Confetti | One-shot `aria-hidden` canvas over the whole window when a Guessle or Random game is won: pieces in the five accent tokens, about two seconds, no pointer events, removed afterwards; skipped under reduced motion |
 | Utility row | Current mode plus visible `Enter` and `Escape` keyboard hints; hidden below 600px wide and below 1128px tall |
@@ -378,6 +389,7 @@ Icons are monochrome line icons, normally 18×18px with a 1.5px stroke. Icon-onl
 - Guessle and Random read the physical keyboard only while their board is visible and focus is outside fields and dialogs. A stage control tapped with a pointer (the variant switch, the nav cards, and the Settings gear) lets go of focus, so the next physical `Enter` submits the guess instead of pressing that control again; keyboard activation keeps focus in place.
 - In forced-colors mode the Random hints keep a `CanvasText` outline in their circle or square shape, because the theme drops their fills. With a button focused, Enter activates that button rather than submitting. The status region announces the typed digits and each scored row.
 - Keep the GitHub repository link accessible while its star count is loading or unavailable.
+- A failed online command moves focus to its error message, so keyboard and screen-reader users hear it and keep their place.
 
 ### Responsive behavior
 
@@ -407,6 +419,7 @@ Use Tailwind breakpoints `sm: 600px`, `md: 900px`, and `lg: 1200px`, and the hei
 | Multiplayer panels and player cards | `src/lib/components/MultiPlayerGame.svelte` |
 | Online entry, lobby, synchronized game, reconnect, and result states | `src/lib/components/OnlineMultiplayerGame.svelte` |
 | Active-mode settings modal | `src/lib/components/SettingsModal.svelte` |
+| Page not found and error screen | `src/routes/+error.svelte`, `src/lib/components/ErrorScreen.svelte` |
 | GitHub repository link and live star count | `src/lib/components/GitHubStarLink.svelte` |
 | Tokens, Tailwind `@theme` mappings, shared control classes, board tiles, keys, clue marks, and global motion/focus styles | `src/app.css` |
 | Display, body, and Thai font loading; title, description, and link-preview tags | `src/app.html` |
@@ -449,6 +462,8 @@ Add new surfaces to this table. The initial editorial design system was recorded
 
 2026-10-18 — Gave shared links a preview: a 1200 × 630 share image, Open Graph and X card tags, a static title and description, and Guessle site icons in place of the default Svelte logo.
 
+2026-10-18 — Closed the gaps from a project audit: online play without a deployed backend now says it is unavailable, failed online commands keep focus on their error, and a saved room that cannot be restored can be retried or forgotten; multiplayer copy no longer borrows Random's attempt limit or "I'm thinking of a number"; local multiplayer keeps the guess field in view on phones; unknown paths show a Page not found screen; scripts opt out of Rocket Loader; an Online tests workflow runs the emulator and online suites; the backend runbook lists the Blaze plan, APIs, and roles, deploys with `--force`, cleans up rate-limit documents, and can enforce App Check; coverage measures `src/` against its goals; old plans are marked superseded; and dependencies were refreshed within their ranges.
+
 ## Change guide
 
 | Change | Required work |
@@ -475,6 +490,12 @@ Add new surfaces to this table. The initial editorial design system was recorded
 
 `@sveltejs/adapter-static` builds to `build/`. GitHub Pages deploys the static client from `main` through `.github/workflows/deploy.yml`, which type-checks, runs the unit and end-to-end tests, and then builds. The site is served at `guessle.pepo.dev`: the custom domain lives in the repository's Pages settings, because an Actions deployment ignores CNAME files, and the root `CNAME` file records it. A domain change updates DNS and the Pages setting first, then `CNAME`, the absolute URLs in `src/app.html` (canonical, `og:url`, and the image tags), and this README together. `.github/workflows/deploy-firebase.yml` deploys Cloud Functions and Firestore rules/indexes to `asia-southeast1`.
 
+Cloudflare proxies `guessle.pepo.dev` (it hosts DNS for `pepo.dev`). Cloudflare's Rocket Loader rewrites `<script>` tags to defer them; this client-only app must start exactly as built, so `src/hooks.server.ts` marks every script in the prerendered pages, `index.html` and the `404.html` fallback alike, `data-cfasync="false"`, which Rocket Loader leaves alone. After changing a file that Cloudflare may have cached, purge it in the Cloudflare dashboard.
+
+The previous domain, `number-guesser.pepo.dev`, must keep redirecting so links shared before the move still open: in Cloudflare, give it a proxied DNS record (for example `AAAA` `100::`) and a Redirect Rule that sends a 301 to `https://guessle.pepo.dev` with the same path and query string, so room invites (`?room=`) keep working. Progress saved on the old domain stays in that origin's local storage; browsers cannot move it.
+
+Unknown paths get the app's own Page not found screen: adapter-static writes `build/404.html` as a fallback page, GitHub Pages serves it for any path it does not have, and the client renders `src/routes/+error.svelte` with a link back to the game. The root layout wraps it too, so it follows the saved or browser language.
+
 ### Link previews
 
 Link crawlers do not run JavaScript, so everything a shared link shows lives in the static `src/app.html`: the `<title>`, the description, the canonical URL, the Open Graph tags (site name, title, a bilingual English-then-Thai description, URL, and the image with its type, size, and alt text), and an X `summary_large_image` card. Room invite links share the same page, so they show the same preview. Image URLs are absolute `https://guessle.pepo.dev/...` URLs, as the platforms require.
@@ -484,7 +505,17 @@ Link crawlers do not run JavaScript, so everything a shared link shows lives in 
 - The sources are the HTML pages in `scripts/link-preview/` and `static/favicon.svg`. `pnpm link-preview` (Node 22.18 or newer) renders the share image and the PNG icons with Playwright's Chromium and stops if a web font fails to load. The pages take their colors from the `:root` tokens in `src/app.css`; `static/favicon.svg` repeats `--stage-border` and `--glass-accent` as hex values, and a unit test fails when they drift, so update it with those tokens before re-rendering.
 - Platforms cache previews. After changing the image, give it a new URL (for example `og-image.png?v=2` in the `og:image` tags) so every app fetches it again, then re-scrape the page with the Facebook Sharing Debugger and LINE Page Poker (`https://poker.line.naver.jp/`). X re-reads cards only about once a week and has no re-scrape tool.
 
-Before the first backend deploy, create the Firestore database and enable Anonymous Auth. Configure these GitHub repository secrets:
+### Backend
+
+Online multiplayer needs the Firebase backend: Cloud Functions (2nd gen) for the room commands and the hourly cleanup, Firestore rules and indexes, and Anonymous Auth. `.github/workflows/deploy-firebase.yml` deploys them when `functions/`, the Firestore rules or indexes, `firebase.json`, or the pnpm lockfile or workspace file change on `main`, or when run by hand.
+
+Before the first backend deploy, in the Firebase and Google Cloud consoles for the production project:
+
+1. Upgrade the project to the Blaze (pay-as-you-go) plan; 2nd-gen Cloud Functions do not deploy on the free plan.
+2. Create the Firestore database and enable Anonymous Auth.
+3. Turn on the APIs the deploy uses: Cloud Functions, Cloud Build, Artifact Registry, Cloud Run, Eventarc, Pub/Sub, Cloud Storage, and Cloud Scheduler (creating the database in step 2 turns on Firestore). Turning them on by hand is simplest; otherwise the deploy service account needs the Service Usage Admin role so the Firebase CLI can turn them on itself. The deploys on 2026-10-10 stopped with `Permissions denied enabling artifactregistry.googleapis.com` for this reason.
+4. Create a service account for the deploy and grant it Firebase Admin, Service Account User, Cloud Scheduler Admin (for the hourly room cleanup), and Artifact Registry Administrator (to set the cleanup policy that deletes old function images). Add its JSON key as the `FIREBASE_SERVICE_ACCOUNT` repository secret; never put it in a public variable or a committed file.
+5. Configure these GitHub repository secrets for the Pages build:
 
 - `PUBLIC_FIREBASE_API_KEY`
 - `PUBLIC_FIREBASE_AUTH_DOMAIN`
@@ -493,13 +524,17 @@ Before the first backend deploy, create the Firestore database and enable Anonym
 - `PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
 - `PUBLIC_FIREBASE_APP_ID`
 
-Add the Firebase service account JSON as the `FIREBASE_SERVICE_ACCOUNT` repository secret. Never put that service account in a public variable or committed file.
+Then run **Deploy Firebase Backend** from the Actions tab. It deploys with `--non-interactive --force`, so the Firebase CLI sets the Artifact Registry cleanup policy (it keeps function images for one day) and removes functions that no longer exist in `functions/src` instead of stopping at a prompt. `--force` also deletes every Firestore index and field override, TTL policies included, that `firestore.indexes.json` does not list, so add any index or TTL policy to that file instead of creating it only in the console. If a step still fails on permissions, the error names the missing permission or API.
 
-The service account needs permission for everything the backend deploy touches. Without it the deploy stops with `403 The caller does not have permission`, as every run before 2026-10-10 did at the Firestore rules step. In Google Cloud IAM, grant it Firebase Admin, Service Account User, and Cloud Scheduler Admin (for the hourly room cleanup), then re-run **Deploy Firebase Backend**. If a later step reports another 403, the error names the missing permission.
+Until the backend is deployed, online commands show "Online play isn't available right now", and single player and local multiplayer are unaffected. A browser cannot see the 404 from a function that does not exist, because the response carries no CORS headers, so the Firebase SDK reports a bare `internal` error; while the browser is online and has not reached a room yet, that maps to the unavailable message; offline, or inside a room whose snapshots prove the backend exists, it maps to the connection message.
 
-Until the backend is deployed, online commands show "Online play isn't available right now" instead of a generic retry message, and single player and local multiplayer are unaffected.
+Abuse protection: each user may create 10 rooms an hour, `maxInstances: 20` caps the running functions, and the hourly cleanup deletes expired rooms and expired rate-limit documents. Anonymous accounts are free to create, so Firebase App Check is the guard against scripts. The code is ready for it; to turn it on:
 
-Firebase App Check is not enforced yet. Turning it on needs a reCAPTCHA Enterprise site key created in the Firebase console, App Check initialized in the client with that key, and `enforceAppCheck` on the callables. Until then, the per-user room limit and `maxInstances: 20` are the abuse guards.
+1. In the Firebase console, register the web app for App Check with a reCAPTCHA Enterprise site key that allows `guessle.pepo.dev`.
+2. Add the site key as the `PUBLIC_FIREBASE_APP_CHECK_SITE_KEY` repository secret. The Pages build passes it to the client, which then attaches App Check tokens to every online command; without the secret the client skips App Check. With the key set, online play also needs reCAPTCHA to load; if a blocker or the network stops it, a command gives up after 80 seconds with the connection message instead of hanging.
+3. After a Pages deploy, watch the App Check metrics in the Firebase console until requests show as verified, then set the repository variable `ENFORCE_APP_CHECK` to `true` and re-run **Deploy Firebase Backend**. Just before deploying, the workflow writes it (`false` when unset; any other value stops the run) to `functions/.env.<project ID>`, which the Firebase CLI deploys as the functions' environment; the file exists only in CI and is gitignored. The callables then reject requests without a valid App Check token with `AUTH_REQUIRED`, which players see as the sign-in error.
+
+`.github/workflows/ci.yml` (Online tests) runs on every push and pull request: with Java 21 and the cached Firebase emulators it runs `pnpm test:functions`, `pnpm test:firebase`, and `pnpm test:e2e:online` against project `demo-number-guessing` only. It does not gate the Pages deploy.
 
 Do not change the workflow, target, CNAME, or DNS without owner approval.
 

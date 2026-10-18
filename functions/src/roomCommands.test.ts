@@ -273,6 +273,7 @@ describe('createRoom', () => {
 		).resolves.toMatchObject({ roomId: expect.any(String) })
 		const limit = await firestore.collection('rateLimits').doc('host').get()
 		expect(limit.data()?.roomCreatedAt).toHaveLength(10)
+		expect(limit.data()?.expiresAt).toEqual(time(7200))
 	})
 })
 

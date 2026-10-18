@@ -144,7 +144,8 @@
                 {#if mode === 'random'}
                     {@render field('max-attempts', t.settings.attempts, $gameStore.settings.maxAttempts, counts([3, 5, 7, 10, 15, 20], t.settings.attemptOption), setting('maxAttempts'))}
                 {/if}
-                <p class="text-sm text-[var(--glass-muted)]">{t.settings.restartHint}</p>
+                <!-- Online has no game to restart until a room exists; the options only shape the next one. -->
+                <p class="text-sm text-[var(--glass-muted)]">{mode === 'online' ? t.settings.nextRoomHint : t.settings.restartHint}</p>
             {/if}
             {@render field('language', t.settings.language, $gameStore.locale, locales.map((locale) => ({ value: locale, label: messages[locale].languageName, lang: locale })), setLocale)}
             {@render field('sound', t.settings.sound, $gameStore.sound ? 'on' : 'off', [{ value: 'on', label: t.settings.soundOn }, { value: 'off', label: t.settings.soundOff }], setSound)}
