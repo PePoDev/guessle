@@ -29,7 +29,6 @@ test("wins today's Guessle, keeps it after a reload, shares it, and continues th
 	await page.goto('/')
 
 	await expect(page.getByRole('heading', { name: 'Guessle #1' })).toBeVisible()
-	await expect(page.getByRole('button', { name: /New Game/ })).toBeDisabled()
 	await guess(page, '123')
 	await expect(page.getByRole('list', { name: 'Guesses' })).toContainText(
 		'Guess 1: 1 not in the number, 2 in another spot, 3 in the right spot',
@@ -103,6 +102,38 @@ test('reveals the answer after six misses and offers Random', async ({ page }) =
 		page.getByRole('group', { name: 'Single-player type' }).getByRole('button', { name: 'Random' }),
 	).toHaveAttribute('aria-pressed', 'true')
 	await expect(page.getByRole('button', { name: /New Game/ })).toBeEnabled()
+})
+
+test("opens Random from New Game and keeps today's puzzle", async ({ page }) => {
+	await page.addInitScript(() => {
+		Math.random = () => 0.5
+	})
+	await page.goto('/')
+	const variants = page.getByRole('group', { name: 'Single-player type' })
+	const board = page.getByRole('list', { name: 'Guesses' })
+	await variants.getByRole('button', { name: 'Random' }).click()
+	await guess(page, '123')
+	await expect(page.getByRole('heading', { name: '6 tries left' })).toBeVisible()
+	await variants.getByRole('button', { name: 'Daily' }).click()
+	await expect(page.getByRole('heading', { name: 'Guessle #1' })).toBeVisible()
+	await guess(page, '123')
+	await expect(board).toContainText('Guess 1: 1 not in the number')
+
+	await page.getByRole('button', { name: /New Game/ }).click()
+
+	await expect(page.getByRole('heading', { name: '7 tries left' })).toBeVisible()
+	await expect(board).not.toContainText('Guess 1')
+	await expect(variants.getByRole('button', { name: 'Random' })).toHaveAttribute('aria-pressed', 'true')
+	// A tapped New Game lets go of focus, so a physical Enter plays the Random board.
+	await expect(page.getByRole('button', { name: /New Game/ })).not.toBeFocused()
+	await guess(page, '500')
+	await expect(page.getByRole('heading', { name: 'Got it in one!' })).toBeVisible()
+
+	await variants.getByRole('button', { name: 'Daily' }).click()
+	await expect(page.getByRole('heading', { name: 'Guessle #1' })).toBeVisible()
+	await expect(board).toContainText('Guess 1: 1 not in the number')
+	await page.reload()
+	await expect(board).toContainText('Guess 1: 1 not in the number')
 })
 
 test('gives a puzzle saved with 5 digits a fresh board without counting the day twice', async ({

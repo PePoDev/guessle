@@ -452,7 +452,7 @@ describe("+page.svelte Component", () => {
       'aria-pressed',
       'false',
     )
-    expect(screen.getByRole('button', { name: 'New Game' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'New Game' })).toBeEnabled()
 
     await user.click(variants().getByRole('button', { name: 'Random' }))
     expect(get(gameStore).mode).toBe('random')
@@ -472,7 +472,7 @@ describe("+page.svelte Component", () => {
 
     await user.click(variants().getByRole('button', { name: 'Daily' }))
     expect(screen.getByRole('heading', { name: 'Guessle #1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'New Game' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'New Game' })).toBeEnabled()
   })
 
   it("should switch between local and online multiplayer", async () => {
@@ -666,6 +666,35 @@ describe("+page.svelte Component", () => {
       "true"
     );
     expect(screen.getByRole("button", { name: "New Game" })).toBeEnabled();
+  });
+
+  it("opens a fresh Random game from Guessle's New Game and keeps today's puzzle", async () => {
+    const user = userEvent.setup();
+    playRandom();
+    render(Page);
+    await enterGuess(user, "123");
+    expect(screen.getByRole("heading", { name: "6 tries left" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Daily" }));
+    await enterGuess(user, "123");
+    const played = "Guess 1: 1 not in the number, 2 in another spot, 3 in the right spot";
+    expect(board().getByText(played)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Instructions/ }));
+
+    await user.click(screen.getByRole("button", { name: "New Game" }));
+
+    expect(get(gameStore).mode).toBe("random");
+    expect(screen.queryByText("How to Play:")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "7 tries left" })).toBeInTheDocument();
+    expect(board().queryByText(/Guess 1:/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Random" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "New Game" })).not.toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Daily" }));
+    expect(screen.getByRole("heading", { name: "Guessle #1" })).toBeInTheDocument();
+    expect(board().getByText(played)).toBeInTheDocument();
   });
 
   it("explains Guessle tiles in Instructions", async () => {
