@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Guessle home-screen icon</title>
+		<link rel="stylesheet" href="../../src/app.css" />
+		<style>
+			/* iOS rounds the corners itself, so the icon fills the square and the chip keeps clear of them. */
+			html,
+			body {
+				margin: 0;
+				width: 180px;
+				height: 180px;
+				overflow: hidden;
+				background: var(--stage-border);
+			}
+
+			img {
+				display: block;
+				width: 180px;
+				height: 180px;
+				transform: scale(0.84);
+			}
+		</style>
+	</head>
+	<body>
+		<img src="../../static/favicon.svg" alt="" />
+	</body>
+</html>

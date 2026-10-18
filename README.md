@@ -121,7 +121,8 @@ firestore.rules                Member-only reads and server-only writes
 firestore.indexes.json         Firestore query indexes
 src/app.css                    Global styles and design tokens
 e2e/                           Playwright flows
-static/                        favicon, robots.txt
+static/                        Share image, site icons, robots.txt
+scripts/render-link-preview.ts Renders the share image and site icons from scripts/link-preview/
 CNAME                          Custom domain record (guessle.pepo.dev)
 ```
 
@@ -203,6 +204,7 @@ Firebase dependencies and backend deployment are explicitly approved for online 
 | Firebase integration | `functions/src/*.test.ts`, `src/lib/firebase/firestore.rules.test.ts` | Emulator-only transactions, cleanup, and security rules |
 | Online end-to-end | `e2e/online-multiplayer.spec.ts` | Separate browser contexts for create/join, turns, host and invited-player reconnect, forfeit, starting without unready players, and errors |
 | Deployment | `src/tests/deploymentWorkflows.test.ts` | Secret injection, missing-config guard, and Java runtime requirements |
+| Link previews | `src/tests/linkPreview.test.ts`, `e2e/link-preview.spec.ts` | Static title, description, Open Graph and X card tags with absolute image URLs; share image and icon sizes and file weight; the files served at those paths |
 | Localization | `src/lib/i18n/*.test.ts` | Locale resolution, persistence, and dictionary parity |
 | Guessle storage | `src/lib/daily/progress.test.ts` | Reading, validating, and saving progress and stats, including guesses saved before the 3-digit switch |
 | Win effects | `src/lib/effects/celebrate.test.ts` | Confetti canvas lifecycle and reduced motion, the chime on a stubbed `AudioContext`, and the saved sound setting |
@@ -407,7 +409,8 @@ Use Tailwind breakpoints `sm: 600px`, `md: 900px`, and `lg: 1200px`, and the hei
 | Active-mode settings modal | `src/lib/components/SettingsModal.svelte` |
 | GitHub repository link and live star count | `src/lib/components/GitHubStarLink.svelte` |
 | Tokens, Tailwind `@theme` mappings, shared control classes, board tiles, keys, clue marks, and global motion/focus styles | `src/app.css` |
-| Display, body, and Thai font loading | `src/app.html` |
+| Display, body, and Thai font loading; title, description, and link-preview tags | `src/app.html` |
+| Share image and site icon sources | `scripts/link-preview/` |
 | English and Thai copy | `src/lib/i18n/messages.ts` |
 
 Add new surfaces to this table. The initial editorial design system was recorded on 2026-07-08.
@@ -444,6 +447,8 @@ Add new surfaces to this table. The initial editorial design system was recorded
 
 2026-10-18 — Removed the New Game button. Random and local multiplayer start over from Play again or a settings change, and the nav rail keeps its three cards: one row on tablets, a column that fills the rail on desktop, and two cards above a full-width Instructions card on phones.
 
+2026-10-18 — Gave shared links a preview: a 1200 × 630 share image, Open Graph and X card tags, a static title and description, and Guessle site icons in place of the default Svelte logo.
+
 ## Change guide
 
 | Change | Required work |
@@ -468,7 +473,16 @@ Add new surfaces to this table. The initial editorial design system was recorded
 
 ## Deployment
 
-`@sveltejs/adapter-static` builds to `build/`. GitHub Pages deploys the static client from `main` through `.github/workflows/deploy.yml`, which type-checks, runs the unit and end-to-end tests, and then builds. The site is served at `guessle.pepo.dev`: the custom domain lives in the repository's Pages settings, because an Actions deployment ignores CNAME files, and the root `CNAME` file records it. A domain change updates DNS and the Pages setting first, then `CNAME`, `og:url` in `src/app.html`, and this README together. `.github/workflows/deploy-firebase.yml` deploys Cloud Functions and Firestore rules/indexes to `asia-southeast1`.
+`@sveltejs/adapter-static` builds to `build/`. GitHub Pages deploys the static client from `main` through `.github/workflows/deploy.yml`, which type-checks, runs the unit and end-to-end tests, and then builds. The site is served at `guessle.pepo.dev`: the custom domain lives in the repository's Pages settings, because an Actions deployment ignores CNAME files, and the root `CNAME` file records it. A domain change updates DNS and the Pages setting first, then `CNAME`, the absolute URLs in `src/app.html` (canonical, `og:url`, and the image tags), and this README together. `.github/workflows/deploy-firebase.yml` deploys Cloud Functions and Firestore rules/indexes to `asia-southeast1`.
+
+### Link previews
+
+Link crawlers do not run JavaScript, so everything a shared link shows lives in the static `src/app.html`: the `<title>`, the description, the canonical URL, the Open Graph tags (site name, title, a bilingual English-then-Thai description, URL, and the image with its type, size, and alt text), and an X `summary_large_image` card. Room invite links share the same page, so they show the same preview. Image URLs are absolute `https://guessle.pepo.dev/...` URLs, as the platforms require.
+
+- `static/og-image.png` is the 1200 × 630 share image. It keeps the wordmark and message inside the centered safe area so square and small crops still read, and stays under 300 KB so WhatsApp, which documents a 600 KB limit, and LINE fetch it reliably.
+- `static/favicon.svg`, `static/favicon.ico` (16 and 32 px), and the full-bleed 180 × 180 `static/apple-touch-icon.png` are the site icons; the last also stands in for the site in iMessage and LINE.
+- The sources are the HTML pages in `scripts/link-preview/` and `static/favicon.svg`. `pnpm link-preview` (Node 22.18 or newer) renders the share image and the PNG icons with Playwright's Chromium and stops if a web font fails to load. The pages take their colors from the `:root` tokens in `src/app.css`; `static/favicon.svg` repeats `--stage-border` and `--glass-accent` as hex values, and a unit test fails when they drift, so update it with those tokens before re-rendering.
+- Platforms cache previews. After changing the image, give it a new URL (for example `og-image.png?v=2` in the `og:image` tags) so every app fetches it again, then re-scrape the page with the Facebook Sharing Debugger and LINE Page Poker (`https://poker.line.naver.jp/`). X re-reads cards only about once a week and has no re-scrape tool.
 
 Before the first backend deploy, create the Firestore database and enable Anonymous Auth. Configure these GitHub repository secrets:
 
