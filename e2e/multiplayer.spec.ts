@@ -422,31 +422,3 @@ test.describe("Multiplayer Game - Four Players", () => {
     }
   });
 });
-
-test.describe("Multiplayer Game - New Game", () => {
-  test("should restart multiplayer game", async ({ page }) => {
-    await page.goto("/");
-    await selectLocalMode(page);
-
-    // Setup players
-    await page.fill('input[placeholder="Enter your name"]', "Alice");
-    await page.fill('input[placeholder="Enter your secret number"]', "123");
-    await page.click('button:has-text("Save & Continue")');
-
-    await page.fill('input[placeholder="Enter your name"]', "Bob");
-    await page.fill('input[placeholder="Enter your secret number"]', "456");
-    await page.click('button:has-text("Save & Continue")');
-
-    // Make a guess
-    await page.fill('input[placeholder="Enter guess"]', "111");
-    await page.click('button:has-text("Submit Guess")');
-
-    // Click New Game
-    await page.click('button:has-text("New Game")');
-
-    // Should be back to setup phase
-    await expect(page.locator("text=Player Setup")).toBeVisible();
-    await expect(page.locator("text=/Alice's turn to setup/")).toBeVisible();
-    await expect(page.getByLabel("Name:")).toHaveValue("Alice");
-  });
-});

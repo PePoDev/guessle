@@ -35,7 +35,6 @@ const en = {
 		single: 'Single Player',
 		multi: 'Multiplayer',
 		instructions: 'Instructions',
-		newGame: 'New Game',
 	},
 	header: {
 		title: 'Guess',
@@ -329,7 +328,6 @@ const th: Messages = {
 		single: 'เล่นคนเดียว',
 		multi: 'เล่นหลายคน',
 		instructions: 'วิธีเล่น',
-		newGame: 'เกมใหม่',
 	},
 	header: {
 		title: 'Guess',

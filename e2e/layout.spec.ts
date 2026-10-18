@@ -109,9 +109,14 @@ test('adapts the stage between phone, tablet, and desktop', async ({ page }) => 
 	const nav = page.getByRole('navigation', { name: 'Game navigation' })
 	await expect(page.locator('.hero')).toBeHidden()
 	expect(await nav.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
-	for (const name of [/Single Player/, /Multiplayer/, /Instructions/, /New Game/]) {
+	for (const name of [/Single Player/, /Multiplayer/, /Instructions/]) {
 		await expect(nav.getByRole('button', { name })).toBeInViewport({ ratio: 1 })
 	}
+	// Three cards in two columns: Instructions takes the second row whole.
+	expect((await nav.getByRole('button', { name: /Instructions/ }).boundingBox())?.width).toBeCloseTo(
+		(await nav.boundingBox())?.width ?? 0,
+		0,
+	)
 	const ticker = page.locator('.ticker-seq').first()
 	await expect(ticker).toHaveCSS('white-space', 'nowrap')
 	expect((await ticker.boundingBox())?.height).toBeLessThan(40)
@@ -138,9 +143,10 @@ test('adapts the stage between phone, tablet, and desktop', async ({ page }) => 
 
 	await page.setViewportSize({ width: 1000, height: 800 })
 	await expect(page.locator('.hero')).toBeVisible()
-	const singlePlayerCard = await nav.getByRole('button', { name: /Single Player/ }).boundingBox()
-	const newGameCard = await nav.getByRole('button', { name: /New Game/ }).boundingBox()
-	expect(newGameCard?.height).toBeLessThan(singlePlayerCard?.height ?? 0)
+	// The three cards share the rail's full height.
+	const rail = await nav.boundingBox()
+	const lastCard = await nav.getByRole('button', { name: /Instructions/ }).boundingBox()
+	expect((lastCard?.y ?? 0) + (lastCard?.height ?? 0)).toBeCloseTo((rail?.y ?? 0) + (rail?.height ?? 0), 0)
 })
 
 test('grows the tiles into a tall window and shrinks them in a short one', async ({ page }) => {

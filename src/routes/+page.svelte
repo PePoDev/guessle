@@ -30,16 +30,6 @@
 	const fillPanel = $derived(singleMode && !showInstructions);
 	const panelScreen = $derived(`${$gameStore.mode}:${showInstructions}`);
 
-	function startNewGame() {
-		// Guessle has one puzzle a day, so another game there is a Random one.
-		if ($gameStore.mode === 'daily') {
-			void selectMode('random');
-			return;
-		}
-		showInstructions = false;
-		gameStore.startNewGame();
-	}
-
 	async function selectMode(mode: GameMode) {
 		showInstructions = false;
 		if ($gameStore.mode === mode) {
@@ -170,7 +160,7 @@
 		</div>
 
 		<div class="stage-body grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-3 p-3 sm:gap-4 sm:p-4 short:gap-3 short:p-3 md:grid-cols-[140px_minmax(320px,6fr)_minmax(0,4fr)] md:grid-rows-1 fit:min-h-0 fit:flex-1">
-			<nav class="nav-rail grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-1 md:grid-rows-[1fr_1fr_1fr_auto]" aria-label={t.nav.label}>
+			<nav class="nav-rail grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-1 md:grid-rows-3" aria-label={t.nav.label}>
 				{#each navCards as card (card.number)}
 					<button
 						type="button"
@@ -187,18 +177,6 @@
 						<span class="nav-label">{card.label}</span>
 					</button>
 				{/each}
-				<button
-					type="button"
-					class="nav-card nav-primary"
-					disabled={$gameStore.mode === 'online'}
-					onclick={tapped(startNewGame)}
-				>
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-						<path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-						<path d="M3 3v5h5" />
-					</svg>
-					<span class="nav-label">{t.nav.newGame}</span>
-				</button>
 			</nav>
 
 			<main bind:this={panel} class="panel relative scroll-py-2 p-4 sm:p-6 md:p-8 md:short:p-6 fit:min-h-0 fit:overflow-y-auto {fillPanel ? 'flex flex-col' : ''}">
@@ -380,17 +358,12 @@
 		cursor: pointer;
 	}
 
-	.nav-card:hover:not(:disabled) {
+	.nav-card:hover {
 		transform: translateY(-2px);
 	}
 
 	.nav-card[aria-pressed='true'] {
 		box-shadow: inset 0 0 0 2.5px var(--stage-border);
-	}
-
-	.nav-card:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
 	}
 
 	.nav-meta {
@@ -424,16 +397,6 @@
 		--nav-fg: var(--accent-orange-fg);
 	}
 
-	.nav-primary {
-		--nav-accent: var(--accent-purple);
-		--nav-fg: var(--accent-purple-fg);
-		flex-direction: row;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		min-height: 56px;
-	}
-
 	@media (max-width: 599px) {
 		.ticker-seq {
 			padding: 6px 0;
@@ -452,8 +415,9 @@
 			font-size: 0.8125rem;
 		}
 
-		.nav-primary {
-			min-height: 44px;
+		/* Three cards in two columns: Instructions takes the second row whole. */
+		.nav-card:last-child {
+			grid-column: span 2;
 		}
 	}
 
@@ -464,11 +428,6 @@
 
 		.nav-label {
 			font-size: 0.875rem;
-		}
-
-		.nav-primary {
-			flex-direction: column;
-			gap: 4px;
 		}
 	}
 

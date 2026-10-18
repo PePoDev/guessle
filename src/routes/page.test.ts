@@ -291,7 +291,6 @@ describe("+page.svelte Component", () => {
     render(Page);
 
     expect(screen.getByLabelText("Display name")).toBeInTheDocument();
-    expect(screen.getByText("New Game").closest("button")).toBeDisabled();
   });
 
   it("selects online mode and pre-fills a valid invite room", async () => {
@@ -319,31 +318,12 @@ describe("+page.svelte Component", () => {
     expect(screen.queryByLabelText("Room ID")).not.toBeInTheDocument();
   });
 
-  it("should have New Game button", () => {
+  it("keeps three cards in the nav rail and no New Game button", () => {
     render(Page);
-    expect(screen.getByText("New Game")).toBeInTheDocument();
-  });
+    const nav = screen.getByRole("navigation", { name: "Game navigation" });
 
-  it("should start new game when New Game button clicked", async () => {
-    const user = userEvent.setup();
-    playRandom();
-    render(Page);
-
-    await enterGuess(user, "123");
-
-    expect(
-      board().getByText("Guess 1: 1 2 3, 0 in the number, 0 in the right spot")
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "6 tries left" })
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "New Game" }));
-
-    expect(board().queryByText(/Guess 1:/)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "7 tries left" })
-    ).toBeInTheDocument();
+    expect(within(nav).getAllByRole("button")).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: /New Game/ })).not.toBeInTheDocument();
   });
 
   it("should display How to Play section", async () => {
@@ -377,22 +357,6 @@ describe("+page.svelte Component", () => {
     expect(screen.getByText("How to Play:")).toBeInTheDocument();
     await user.click(instructionsCard);
     expect(screen.queryByText("How to Play:")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("group", { name: "Number keypad" })
-    ).toBeInTheDocument();
-  });
-
-  it("should return to the game when New Game is clicked from instructions", async () => {
-    const user = userEvent.setup();
-    playRandom();
-    render(Page);
-    await user.click(screen.getByRole("button", { name: /Instructions/ }));
-    await user.click(screen.getByText("New Game"));
-
-    expect(screen.queryByText("How to Play:")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "7 tries left" })
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("group", { name: "Number keypad" })
     ).toBeInTheDocument();
@@ -452,7 +416,6 @@ describe("+page.svelte Component", () => {
       'aria-pressed',
       'false',
     )
-    expect(screen.getByRole('button', { name: 'New Game' })).toBeEnabled()
 
     await user.click(variants().getByRole('button', { name: 'Random' }))
     expect(get(gameStore).mode).toBe('random')
@@ -461,7 +424,6 @@ describe("+page.svelte Component", () => {
       'true',
     )
     expect(screen.getByRole('heading', { name: '7 tries left' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'New Game' })).toBeEnabled()
     expect(
       screen.getByRole('button', { name: 'Open Random settings' }),
     ).toBeInTheDocument()
@@ -472,7 +434,6 @@ describe("+page.svelte Component", () => {
 
     await user.click(variants().getByRole('button', { name: 'Daily' }))
     expect(screen.getByRole('heading', { name: 'Guessle #1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'New Game' })).toBeEnabled()
   })
 
   it("should switch between local and online multiplayer", async () => {
@@ -503,12 +464,6 @@ describe("+page.svelte Component", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Display name")).toBeInTheDocument();
     });
-  });
-
-  it("should disable New Game in online mode", () => {
-    gameStore.setMode("online");
-    render(Page);
-    expect(screen.getByText("New Game").closest("button")).toBeDisabled();
   });
 
   it("should show the authoritative room digit count online", async () => {
@@ -665,10 +620,9 @@ describe("+page.svelte Component", () => {
       "aria-pressed",
       "true"
     );
-    expect(screen.getByRole("button", { name: "New Game" })).toBeEnabled();
   });
 
-  it("opens a fresh Random game from Guessle's New Game and keeps today's puzzle", async () => {
+  it("starts a fresh Random game after Guessle and keeps today's puzzle", async () => {
     const user = userEvent.setup();
     playRandom();
     render(Page);
@@ -678,19 +632,11 @@ describe("+page.svelte Component", () => {
     await enterGuess(user, "123");
     const played = "Guess 1: 1 not in the number, 2 in another spot, 3 in the right spot";
     expect(board().getByText(played)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Instructions/ }));
 
-    await user.click(screen.getByRole("button", { name: "New Game" }));
+    await user.click(screen.getByRole("button", { name: "Random" }));
 
-    expect(get(gameStore).mode).toBe("random");
-    expect(screen.queryByText("How to Play:")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "7 tries left" })).toBeInTheDocument();
     expect(board().queryByText(/Guess 1:/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Random" })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
-    expect(screen.getByRole("button", { name: "New Game" })).not.toHaveFocus();
 
     await user.click(screen.getByRole("button", { name: "Daily" }));
     expect(screen.getByRole("heading", { name: "Guessle #1" })).toBeInTheDocument();
@@ -729,13 +675,6 @@ describe("+page.svelte Component", () => {
       "Open Daily Guessle settings"
     );
     expect(settingsButton).toHaveClass("btn-secondary");
-  });
-
-  it("should have New Game button with proper styling", () => {
-    render(Page);
-    const newGameButton = screen.getByText("New Game").closest("button");
-    expect(newGameButton).toHaveClass("nav-card");
-    expect(newGameButton).toHaveClass("nav-primary");
   });
 });
 

@@ -101,10 +101,9 @@ test('reveals the answer after six misses and offers Random', async ({ page }) =
 	await expect(
 		page.getByRole('group', { name: 'Single-player type' }).getByRole('button', { name: 'Random' }),
 	).toHaveAttribute('aria-pressed', 'true')
-	await expect(page.getByRole('button', { name: /New Game/ })).toBeEnabled()
 })
 
-test("opens Random from New Game and keeps today's puzzle", async ({ page }) => {
+test("starts a fresh Random game after Guessle and keeps today's puzzle", async ({ page }) => {
 	await page.addInitScript(() => {
 		Math.random = () => 0.5
 	})
@@ -119,18 +118,14 @@ test("opens Random from New Game and keeps today's puzzle", async ({ page }) => 
 	await guess(page, '123')
 	await expect(board).toContainText('Guess 1: 1 not in the number')
 
-	await page.getByRole('button', { name: /New Game/ }).click()
+	await variants.getByRole('button', { name: 'Random' }).click()
 
 	await expect(page.getByRole('heading', { name: '7 tries left' })).toBeVisible()
 	await expect(board).not.toContainText('Guess 1')
-	await expect(variants.getByRole('button', { name: 'Random' })).toHaveAttribute('aria-pressed', 'true')
-	// A tapped New Game lets go of focus, so a physical Enter plays the Random board.
-	await expect(page.getByRole('button', { name: /New Game/ })).not.toBeFocused()
 	await guess(page, '500')
 	await expect(page.getByRole('heading', { name: 'Got it in one!' })).toBeVisible()
 
 	await variants.getByRole('button', { name: 'Daily' }).click()
-	await expect(page.getByRole('heading', { name: 'Guessle #1' })).toBeVisible()
 	await expect(board).toContainText('Guess 1: 1 not in the number')
 	await page.reload()
 	await expect(board).toContainText('Guess 1: 1 not in the number')

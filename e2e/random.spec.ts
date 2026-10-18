@@ -67,7 +67,6 @@ test('switches to Random with a tap and plays from the physical keyboard', async
 		.getByRole('button', { name: 'Random' })
 	await expect(random).toHaveAttribute('aria-pressed', 'true')
 	await expect(random).not.toBeFocused()
-	await expect(page.getByRole('button', { name: /New Game/ })).toBeEnabled()
 	await expect(page.getByText('in the number', { exact: true })).toBeVisible()
 	await expect(page.getByText('in the right spot', { exact: true })).toBeVisible()
 
@@ -185,7 +184,7 @@ test('changes the digits and attempts in Settings', async ({ page }) => {
 	await expect(page.getByText('The number was 50000')).toBeVisible()
 })
 
-test('starts a fresh board with New Game and keeps the game through Settings and Instructions', async ({
+test('keeps the game through Settings and Instructions', async ({
 	page,
 }) => {
 	await openRandom(page)
@@ -202,14 +201,9 @@ test('starts a fresh board with New Game and keeps the game through Settings and
 	await expect(board).toContainText('Guess 1: 1 2 3')
 	await expect(page.getByRole('heading', { name: '6 tries left' })).toBeVisible()
 
-	await page.getByRole('button', { name: /New Game/ }).click()
-
-	await expect(board).not.toContainText('Guess 1')
-	await expect(page.getByRole('heading', { name: '7 tries left' })).toBeVisible()
-	// A tapped New Game lets go of focus, so a physical Enter submits instead of restarting.
-	await expect(page.getByRole('button', { name: /New Game/ })).not.toBeFocused()
+	// A tapped nav card lets go of focus, so a physical Enter still submits the guess.
 	await guess(page, '500')
-	await expect(page.getByRole('heading', { name: 'Got it in one!' })).toBeVisible()
+	await expect(page.getByRole('heading', { name: 'Solved in 2 tries!' })).toBeVisible()
 })
 
 test('keeps keyboard focus on the switch as it moves between boards', async ({ page }) => {
